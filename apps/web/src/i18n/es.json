@@ -13,6 +13,7 @@
 	"screen.errorPrefix": "Error: {message}",
 	"screen.stalled": "Conexión perdida — generando un código nuevo…",
 	"sender.joining": "Entrando…",
+	"sender.codecPreference": "Códec",
 	"sender.quality": "Calidad de vídeo",
 	"sender.joinError.room-not-found": "Ese código no existe o ya ha caducado",
 	"sender.joinError.room-full": "Esa pantalla ya tiene un emisor",

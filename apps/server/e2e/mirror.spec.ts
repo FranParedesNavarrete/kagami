@@ -36,9 +36,11 @@ test("room code, sender joins, shares, and disconnect returns a fresh code", asy
 
 	// Regresion del hallazgo en docs/webrtc-codec.md: Chrome/Brave negocian
 	// VP9/AV1 por defecto para compartir pantalla y la tele real se quedaba
-	// en negro sin avisar. El emisor debe mostrar H.264 (o VP8), nunca otra
-	// cosa, y nunca "negotiating..." indefinidamente.
-	await expect(sender.getByText(/codec: video\/(h264|vp8)/i)).toBeVisible({
+	// en negro sin avisar. VP8 es el preferido por defecto (medido: 4.5 min
+	// reales sin cortes en esta tele; H.264 solo funciono parcialmente en
+	// Safari) — el emisor debe mostrarlo, nunca VP9/AV1, nunca
+	// "negotiating..." indefinidamente.
+	await expect(sender.getByText(/codec: video\/vp8/i)).toBeVisible({
 		timeout: 10_000,
 	});
 

@@ -18,6 +18,14 @@ const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
 // red de seguridad para cuando vuelva a pasar, no una prueba de que no
 // volvera a pasar. "Vivo" = connectionState connected pero framesDecoded
 // dejo de avanzar — eso es un decodificador atascado, no una red caida.
+//
+// LIMITACION CONOCIDA, sin verificar: un restart-ice renegocia la
+// conexion, pero si lo que esta atascado es el decodificador de la
+// propia tele (no la red ni el peer connection), reiniciar el ICE puede
+// no arreglar nada — el problema no es de conectividad. Sin probar
+// contra un cuelgue real todavia; si el restart-ice no rescata el caso
+// real, lo unico garantizado es que STALL_GIVEUP_MS igualmente saca de
+// la imagen congelada y vuelve a un codigo nuevo.
 const STALL_RESTART_MS = 5_000;
 const STALL_GIVEUP_MS = 15_000;
 

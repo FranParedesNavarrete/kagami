@@ -5,8 +5,11 @@ import { useSignaling } from "../../hooks/useSignaling.js";
 import { type I18nKey, useI18n } from "../../i18n/i18n.js";
 import { canMirror, isIOS } from "../../lib/capabilities.js";
 import {
+	type CodecPreference,
 	UnsupportedCodecError,
 	applyCodecPreferences,
+	loadCodecPreference,
+	saveCodecPreference,
 } from "../../lib/codec.js";
 import {
 	QUALITY_PRESETS,
@@ -69,6 +72,8 @@ export function SenderView({ initialCode, onExit }: Props) {
 	const { t } = useI18n();
 	const [state, setState] = useState<SenderState>({ phase: "joining" });
 	const [quality, setQuality] = useState<QualityPreset>(loadQualityPreset);
+	const [codecPref, setCodecPref] =
+		useState<CodecPreference>(loadCodecPreference);
 	const [stats, setStats] = useState<LiveStats>(EMPTY_STATS);
 	const sessionRef = useRef<PeerSession | null>(null);
 	const streamRef = useRef<MediaStream | null>(null);
@@ -101,7 +106,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 						direction: "sendonly",
 						streams: [stream],
 					});
-					applyCodecPreferences(transceiver);
+					applyCodecPreferences(transceiver, codecPref);
 					await applyQualityToSender(transceiver.sender, quality).catch((err) =>
 						console.warn("setParameters failed", err),
 					);
@@ -114,7 +119,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 			await pc.setLocalDescription(offer);
 			send({ type: "offer", sdp: offer as { type: "offer"; sdp: string } });
 		},
-		[send, quality],
+		[send, quality, codecPref],
 	);
 
 	useEffect(
@@ -290,6 +295,30 @@ export function SenderView({ initialCode, onExit }: Props) {
 
 			{state.phase === "ready" && (
 				<>
+					<div className="flex flex-col items-center gap-2">
+						<span className="text-sm text-white/60">
+							{t("sender.codecPreference")}
+						</span>
+						<div className="flex gap-2">
+							{(["vp8", "h264", "auto"] as const).map((pref) => (
+								<button
+									key={pref}
+									type="button"
+									onClick={() => {
+										setCodecPref(pref);
+										saveCodecPreference(pref);
+									}}
+									className={
+										pref === codecPref
+											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold uppercase"
+											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm uppercase text-white/70"
+									}
+								>
+									{pref}
+								</button>
+							))}
+						</div>
+					</div>
 					<div className="flex flex-col items-center gap-2">
 						<span className="text-sm text-white/60">{t("sender.quality")}</span>
 						<div className="flex gap-2">

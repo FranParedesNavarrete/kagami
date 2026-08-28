@@ -13,6 +13,7 @@
 	"screen.errorPrefix": "Error: {message}",
 	"screen.stalled": "Connection stalled — generating a new code…",
 	"sender.joining": "Joining…",
+	"sender.codecPreference": "Codec",
 	"sender.quality": "Video quality",
 	"sender.joinError.room-not-found": "That code doesn't exist or already expired",
 	"sender.joinError.room-full": "That screen already has a sender",
