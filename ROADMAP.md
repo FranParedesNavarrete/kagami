@@ -32,12 +32,15 @@
             si los picos ICMP afectan al video real o no.
 - [x] `docs/spike-tv.md` con la tabla de resultados y el user agent
       (plantilla + instrucciones listas; la tabla la rellena el humano).
-- [ ] **[humano]** Ejecutar el spike en la LG con Fran delante.
+- [x] **[humano]** Ejecutar el spike en la LG con Fran delante.
 
-**Puerta**: WebRTC recvonly funciona en la tele y la estabilidad de 10
-minutos es aceptable a ojo. Si WebRTC falla o tartamudea sin remedio, el
-proyecto pivota a cast-only (o a receptor no-navegador) y SPECS se
-actualiza ANTES de construir nada mas.
+**Puerta: CUMPLIDA** (2026-08-28, ver `docs/spike-tv.md` para el detalle
+completo). WebRTC recvonly funciona en la tele con H.264 y VP8; 10
+minutos de estabilidad sin tartamudeo perceptible ("se ve perfecto no
+noto delay"). El proyecto sigue hacia M0 sin pivotar. Queda una deuda
+abierta no bloqueante: el test de `<video>` por range requests sigue
+fallando en la tele — hay que resolverlo antes de dar M1 (cast) por
+diseñado, ver `docs/spike-tv.md`.
 
 ## M0 · Espejo de escritorio → tele
 

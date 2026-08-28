@@ -9,10 +9,9 @@
 Servidor Node de un fichero (`spike/server.mjs`) que sirve `spike/public/`
 por HTTP plano en el puerto 7421 y hace de señalización WS (`/ws`) para las
 seis pruebas. Verificado primero en local (Chromium headless, dos contextos
-simulando tele+emisor con `--use-fake-device-for-media-stream`) y despues
-en campo (Mac + iPhone). Ejecutado ya en la LG real — ver resultados
-abajo: cinco de seis pruebas en verde, falta cerrar el diagnostico de la
-sexta y el juicio a ojo de la estabilidad.
+simulando tele+emisor con `--use-fake-device-for-media-stream`), despues en
+campo (Mac + iPhone), y finalmente en la LG real con Fran delante. Puerta
+cumplida — ver veredicto abajo.
 
 ## Cómo ejecutarlo
 
@@ -54,23 +53,36 @@ razonablemente moderno, no el NetCast real de antes de 2014.)
 | 1 | WebSocket: conectar + eco + reconexión (30 s) | ✅ Pass | connect 17ms, reconnect+echo 5ms |
 | 2 | RTCPeerConnection recvonly — H.264 | ✅ Pass | |
 | 3 | RTCPeerConnection recvonly — VP8 | ✅ Pass | |
-| 4 | `<video>` HTTP con range requests (salto a mitad) | ❌ Fail | sigue en rojo tras el fix de adjuntar el video al DOM (commit `1792b78`) — pendiente ver el texto exacto del detalle para diagnosticar mejor |
+| 4 | `<video>` HTTP con range requests (salto a mitad) | ❌ Fail | sigue en rojo tras el fix de adjuntar el video al DOM (commit `1792b78`); mismo resultado en dos corridas. Ver "Deuda abierta" abajo — no bloquea esta puerta, sí a M1. |
 | 5 | Autoplay sin interacción | ✅ Pass | |
-| 6 | Estabilidad, 10 min conectado | ✅ Pass (dato) / ⬜ Pendiente juicio a ojo | fotogramas perdidos: 3942/5871 (67%), RTT WS avg/max: 8ms/35ms, picos >200ms: 0 |
+| 6 | Estabilidad, 10 min conectado | ✅ Pass | Corrida 1: 3942/5871 fotogramas perdidos (67%), RTT WS avg/max 8/35ms, 0 picos. Corrida 2 (pestaña del emisor en primer plano): 3998/17427 (23%), RTT WS avg/max 8/37ms, 0 picos. Juicio a ojo de Fran: **"se ve perfecto no noto delay"**. |
 
 **Nota sobre la prueba 6**: la señal de red (RTT del WS) es excelente y
-sin picos — contradice, para esta corrida, la hipótesis de que los picos
-ICMP de ~700ms (ver cabecera de ROADMAP.md) afectan al vídeo. El 67% de
-fotogramas perdidos es otra cosa: apunta a que el decodificador/renderer
-de la tele no da abasto con el stream WebRTC, no a la red. Falta el
-juicio a ojo (¿se vio fluido o iba a tirones?) para saber si es aceptable.
+sin picos en ambas corridas — descarta, para estas corridas, que los
+picos ICMP de ~700ms (ver cabecera de ROADMAP.md) afecten al vídeo. Los
+fotogramas perdidos varían mucho entre corridas (67% → 23%) y coinciden
+con tener la pestaña del emisor en primer plano o no — apunta a
+`requestAnimationFrame` throttled en segundo plano en el Mac, no a un
+límite de la tele. Con la pestaña activa, el resultado se ve y siente
+bien: veredicto a ojo de quien lo probó, sin tartamudeo perceptible.
 
 ## Veredicto de la puerta
 
-_(pendiente el juicio a ojo de la prueba 6 — ver arriba. El núcleo de la
-puerta, "WebRTC recvonly funciona en la tele", está cumplido: H.264 y
-VP8 conectan y hay vídeo. Lo que falta decidir es si el 67% de
-fotogramas perdidos es "tartamudea sin remedio" o no.)_
+**Cumplida.** WebRTC recvonly funciona en la tele con H.264 y VP8, y la
+estabilidad de 10 minutos es aceptable a ojo (ver cita arriba). El
+proyecto sigue adelante hacia M0 tal cual está en SPECS.md — no hace
+falta pivotar a cast-only.
+
+### Deuda abierta (no bloquea M-1, sí a resolver antes de M1)
+
+`<video>` por HTTP range requests sigue fallando en la tele (y falló
+igual en el iPhone antes del fix de M-1). El fix de adjuntar el video
+oculto al DOM no lo resolvió, y no se ha visto el texto exacto del
+detalle de fallo en la tele para acotar más. Esto es exactamente el
+mecanismo que M1 (cast de fichero) necesita que funcione — hay que
+diagnosticarlo con calma (mirar Network en el navegador de la tele si
+webOS lo permite, o loggear las cabeceras Range que llegan al server)
+antes de dar M1 por diseñado.
 
 ## Notas para quien lo ejecute
 
