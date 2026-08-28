@@ -2,14 +2,14 @@
 // MediaStream y lo manda por WebRTC forzando el codec elegido, para que la
 // tele pueda probar H.264 y VP8 por separado.
 
-const canvas = document.getElementById('clock');
-const ctx = canvas.getContext('2d');
-const statusEl = document.getElementById('status');
-const logEl = document.getElementById('log');
+const canvas = document.getElementById("clock");
+const ctx = canvas.getContext("2d");
+const statusEl = document.getElementById("status");
+const logEl = document.getElementById("log");
 
 function log(line) {
-  logEl.textContent += `${new Date().toISOString().slice(11, 23)}  ${line}\n`;
-  logEl.scrollTop = logEl.scrollHeight;
+	logEl.textContent += `${new Date().toISOString().slice(11, 23)}  ${line}\n`;
+	logEl.scrollTop = logEl.scrollHeight;
 }
 
 // Reloj + bola rebotando: el numero confirma el instante exacto (para el
@@ -18,37 +18,37 @@ function log(line) {
 let ballX = 0;
 let ballDir = 4;
 function drawFrame() {
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+	ctx.fillStyle = "#000";
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = '#fff';
-  ctx.font = '64px ui-monospace, monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(String(Date.now()), canvas.width / 2, canvas.height / 2);
+	ctx.fillStyle = "#fff";
+	ctx.font = "64px ui-monospace, monospace";
+	ctx.textAlign = "center";
+	ctx.fillText(String(Date.now()), canvas.width / 2, canvas.height / 2);
 
-  ballX += ballDir;
-  if (ballX < 0 || ballX > canvas.width - 20) ballDir *= -1;
-  ctx.fillStyle = '#2563eb';
-  ctx.beginPath();
-  ctx.arc(ballX + 10, canvas.height - 40, 10, 0, Math.PI * 2);
-  ctx.fill();
+	ballX += ballDir;
+	if (ballX < 0 || ballX > canvas.width - 20) ballDir *= -1;
+	ctx.fillStyle = "#2563eb";
+	ctx.beginPath();
+	ctx.arc(ballX + 10, canvas.height - 40, 10, 0, Math.PI * 2);
+	ctx.fill();
 
-  requestAnimationFrame(drawFrame);
+	requestAnimationFrame(drawFrame);
 }
 drawFrame();
 
 // ---------------------------------------------------------------- WS
 function wsUrl() {
-  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?role=sender`;
+	return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?role=sender`;
 }
 
 let ws;
 function connectWs() {
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(wsUrl());
-    socket.onopen = () => resolve(socket);
-    socket.onerror = () => reject(new Error('ws error'));
-  });
+	return new Promise((resolve, reject) => {
+		const socket = new WebSocket(wsUrl());
+		socket.onopen = () => resolve(socket);
+		socket.onerror = () => reject(new Error("ws error"));
+	});
 }
 
 // ------------------------------------------------------------- WebRTC
@@ -58,92 +58,121 @@ function connectWs() {
 let activeSession = null; // { id, pc, pending }
 
 function addOrQueueIce(session, candidate) {
-  if (session.pc.remoteDescription) {
-    session.pc.addIceCandidate(candidate).catch((err) => log(`addIceCandidate failed: ${err.message}`));
-  } else {
-    session.pending.push(candidate);
-  }
+	if (session.pc.remoteDescription) {
+		session.pc
+			.addIceCandidate(candidate)
+			.catch((err) => log(`addIceCandidate failed: ${err.message}`));
+	} else {
+		session.pending.push(candidate);
+	}
 }
 
 function flushQueuedIce(session) {
-  for (const candidate of session.pending.splice(0)) {
-    session.pc.addIceCandidate(candidate).catch((err) => log(`addIceCandidate failed: ${err.message}`));
-  }
+	for (const candidate of session.pending.splice(0)) {
+		session.pc
+			.addIceCandidate(candidate)
+			.catch((err) => log(`addIceCandidate failed: ${err.message}`));
+	}
 }
 
 async function runTest(codec) {
-  statusEl.textContent = `${codec}: connecting...`;
-  log(`starting ${codec} test`);
+	statusEl.textContent = `${codec}: connecting...`;
+	log(`starting ${codec} test`);
 
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    ws = await connectWs();
-    ws.addEventListener('message', onWsMessage);
-  }
+	if (!ws || ws.readyState !== WebSocket.OPEN) {
+		ws = await connectWs();
+		ws.addEventListener("message", onWsMessage);
+	}
 
-  if (activeSession) activeSession.pc.close();
-  const pc = new RTCPeerConnection({ iceServers: [] });
-  const sessionId = crypto.randomUUID();
-  activeSession = { id: sessionId, pc, pending: [] };
+	if (activeSession) activeSession.pc.close();
+	const pc = new RTCPeerConnection({ iceServers: [] });
+	const sessionId = crypto.randomUUID();
+	activeSession = { id: sessionId, pc, pending: [] };
 
-  pc.onconnectionstatechange = () => {
-    log(`${codec}: connection state = ${pc.connectionState}`);
-    statusEl.textContent = `${codec}: ${pc.connectionState}`;
-  };
-  pc.onicecandidate = (ev) => {
-    if (ev.candidate) ws.send(JSON.stringify({ type: 'ice', sessionId, candidate: ev.candidate }));
-  };
+	pc.onconnectionstatechange = () => {
+		log(`${codec}: connection state = ${pc.connectionState}`);
+		statusEl.textContent = `${codec}: ${pc.connectionState}`;
+	};
+	pc.onicecandidate = (ev) => {
+		if (ev.candidate)
+			ws.send(
+				JSON.stringify({ type: "ice", sessionId, candidate: ev.candidate }),
+			);
+	};
 
-  const stream = canvas.captureStream(30);
-  const track = stream.getVideoTracks()[0];
-  // streams: [stream] es lo que hace que el lado receptor vea ev.streams[0]
-  // poblado en ontrack; sin esto llega vacio y no hay nada que asignar a
-  // video.srcObject.
-  const transceiver = pc.addTransceiver(track, { direction: 'sendonly', streams: [stream] });
+	const stream = canvas.captureStream(30);
+	const track = stream.getVideoTracks()[0];
+	// streams: [stream] es lo que hace que el lado receptor vea ev.streams[0]
+	// poblado en ontrack; sin esto llega vacio y no hay nada que asignar a
+	// video.srcObject.
+	const transceiver = pc.addTransceiver(track, {
+		direction: "sendonly",
+		streams: [stream],
+	});
 
-  if (transceiver.setCodecPreferences && RTCRtpSender.getCapabilities) {
-    const caps = RTCRtpSender.getCapabilities('video');
-    const mime = `video/${codec}`;
-    const preferred = caps.codecs.filter((c) => c.mimeType.toLowerCase() === mime);
-    const rest = caps.codecs.filter((c) => c.mimeType.toLowerCase() !== mime);
-    if (preferred.length === 0) {
-      log(`${codec}: not in this browser's getCapabilities() — offer will use default codec order`);
-    } else {
-      transceiver.setCodecPreferences([...preferred, ...rest]);
-    }
-  }
+	if (transceiver.setCodecPreferences && RTCRtpSender.getCapabilities) {
+		const caps = RTCRtpSender.getCapabilities("video");
+		const mime = `video/${codec}`;
+		const preferred = caps.codecs.filter(
+			(c) => c.mimeType.toLowerCase() === mime,
+		);
+		const rest = caps.codecs.filter((c) => c.mimeType.toLowerCase() !== mime);
+		if (preferred.length === 0) {
+			log(
+				`${codec}: not in this browser's getCapabilities() — offer will use default codec order`,
+			);
+		} else {
+			transceiver.setCodecPreferences([...preferred, ...rest]);
+		}
+	}
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  ws.send(JSON.stringify({ type: 'offer', codec, sessionId, sdp: pc.localDescription }));
+	const offer = await pc.createOffer();
+	await pc.setLocalDescription(offer);
+	ws.send(
+		JSON.stringify({
+			type: "offer",
+			codec,
+			sessionId,
+			sdp: pc.localDescription,
+		}),
+	);
 }
 
 function onWsMessage(ev) {
-  const msg = JSON.parse(ev.data);
-  if (!activeSession || (msg.sessionId && msg.sessionId !== activeSession.id)) {
-    if (msg.type === 'answer' || msg.type === 'ice') return;
-  }
-  if (msg.type === 'answer') {
-    activeSession.pc
-      .setRemoteDescription(msg.sdp)
-      .then(() => flushQueuedIce(activeSession))
-      .catch((err) => log(`setRemoteDescription failed: ${err.message}`));
-  } else if (msg.type === 'ice') {
-    addOrQueueIce(activeSession, msg.candidate);
-  } else if (msg.type === 'error') {
-    log(`server error: ${msg.reason}`);
-    statusEl.textContent = msg.reason;
-  } else if (msg.type === 'peer-left') {
-    log('screen disconnected');
-  }
+	const msg = JSON.parse(ev.data);
+	if (!activeSession || (msg.sessionId && msg.sessionId !== activeSession.id)) {
+		if (msg.type === "answer" || msg.type === "ice") return;
+	}
+	if (msg.type === "answer") {
+		activeSession.pc
+			.setRemoteDescription(msg.sdp)
+			.then(() => flushQueuedIce(activeSession))
+			.catch((err) => log(`setRemoteDescription failed: ${err.message}`));
+	} else if (msg.type === "ice") {
+		addOrQueueIce(activeSession, msg.candidate);
+	} else if (msg.type === "error") {
+		log(`server error: ${msg.reason}`);
+		statusEl.textContent = msg.reason;
+	} else if (msg.type === "peer-left") {
+		log("screen disconnected");
+	}
 }
 
-document.getElementById('btn-h264').addEventListener('click', () => runTest('h264').catch((err) => log(`error: ${err.message}`)));
-document.getElementById('btn-vp8').addEventListener('click', () => runTest('vp8').catch((err) => log(`error: ${err.message}`)));
+document
+	.getElementById("btn-h264")
+	.addEventListener("click", () =>
+		runTest("h264").catch((err) => log(`error: ${err.message}`)),
+	);
+document
+	.getElementById("btn-vp8")
+	.addEventListener("click", () =>
+		runTest("vp8").catch((err) => log(`error: ${err.message}`)),
+	);
 
 connectWs()
-  .then((socket) => {
-    ws = socket;
-    ws.addEventListener('message', onWsMessage);
-    log('connected to signaling server');
-  })
-  .catch((err) => log(`ws connect failed: ${err.message}`));
+	.then((socket) => {
+		ws = socket;
+		ws.addEventListener("message", onWsMessage);
+		log("connected to signaling server");
+	})
+	.catch((err) => log(`ws connect failed: ${err.message}`));
