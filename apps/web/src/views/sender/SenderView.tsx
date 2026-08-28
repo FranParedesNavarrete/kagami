@@ -34,7 +34,7 @@ type SenderState =
 	| { phase: "ios-blocked" }
 	| { phase: "ready"; error?: string }
 	| { phase: "sharing"; label: string; hasAudio: boolean }
-	| { phase: "ended" }
+	| { phase: "session-ended"; reason: "screen-ended" | "self-stopped" }
 	| { phase: "error"; message: string };
 
 interface LiveStats {
@@ -149,12 +149,17 @@ export function SenderView({ initialCode, onExit }: Props) {
 						break;
 					}
 					case "peer-left":
+						// La sala ha muerto de verdad en el server (RoomService.leave
+						// la borra siempre, la inicie quien la inicie) — un codigo
+						// usado no vuelve (SPECS.md §6). Nada de "ready", nada que
+						// sugiera que se puede seguir compartiendo aqui mismo.
 						for (const track of streamRef.current?.getTracks() ?? [])
 							track.stop();
 						streamRef.current = null;
 						sessionRef.current?.pc.close();
 						sessionRef.current = null;
-						setState({ phase: "ended" });
+						setStats(EMPTY_STATS);
+						setState({ phase: "session-ended", reason: "screen-ended" });
 						break;
 					case "error":
 						setState({ phase: "error", message: t(joinErrorKey(msg.code)) });
@@ -271,13 +276,18 @@ export function SenderView({ initialCode, onExit }: Props) {
 	}
 
 	function stopSharing() {
+		// Enviar "leave" borra la sala en el server para siempre (un codigo
+		// usado no vuelve, SPECS.md §6) — volver a "ready" aqui era el bug:
+		// dejaba los selectores y el boton "Share screen" como si la sala
+		// siguiera viva, y pulsarlo no hacia nada porque el server ya habia
+		// olvidado el rol/codigo de esta conexion.
 		for (const track of streamRef.current?.getTracks() ?? []) track.stop();
 		streamRef.current = null;
 		sessionRef.current?.pc.close();
 		sessionRef.current = null;
 		setStats(EMPTY_STATS);
 		send({ type: "leave" });
-		setState({ phase: "ready" });
+		setState({ phase: "session-ended", reason: "self-stopped" });
 	}
 
 	return (
@@ -386,15 +396,19 @@ export function SenderView({ initialCode, onExit }: Props) {
 				</>
 			)}
 
-			{state.phase === "ended" && (
+			{state.phase === "session-ended" && (
 				<>
-					<p className="text-2xl">{t("sender.screenLeft")}</p>
+					<p className="text-2xl">
+						{state.reason === "screen-ended"
+							? t("sender.screenEnded")
+							: t("sender.selfStopped")}
+					</p>
 					<button
 						type="button"
 						onClick={onExit}
 						className="text-blue-400 underline"
 					>
-						{t("sender.tryAgain")}
+						{t("sender.backToStart")}
 					</button>
 				</>
 			)}

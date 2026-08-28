@@ -51,7 +51,56 @@ test("room code, sender joins, shares, and disconnect returns a fresh code", asy
 	expect(secondCode).toMatch(CODE_RE);
 	expect(secondCode).not.toBe(firstCode);
 
+	// Regresion del bug "el emisor no se entera de que la sala ha
+	// terminado": tras enviar leave, el server borra la sala para siempre
+	// (SPECS.md §6) — el emisor NO debe volver a "ready" con el boton
+	// Share screen como si pudiera resucitarla pulsandolo.
+	await expect(sender.getByText("You stopped sharing")).toBeVisible({
+		timeout: 10_000,
+	});
+	await expect(sender.getByText("Share screen")).not.toBeVisible();
+
+	await sender.getByText("Back to start").click();
+	await expect(sender.getByText("Be the screen")).toBeVisible();
+	expect(new URL(sender.url()).search).toBe(""); // el ?code= muerto no sobrevive
+
 	await screenCtx.close();
+	await senderCtx.close();
+});
+
+test("screen ending the session sends the sender back home with a clear message", async ({
+	browser,
+}) => {
+	const screenCtx = await browser.newContext();
+	const senderCtx = await browser.newContext();
+	const screen = await screenCtx.newPage();
+	const sender = await senderCtx.newPage();
+
+	await screen.goto("/");
+	await screen.getByText("Be the screen").click();
+	const code = (await screen.getByTestId("room-code").innerText()).trim();
+
+	await sender.goto(`/?code=${code}`);
+	await sender.getByText("Share screen").click();
+	await expect(screen.locator("video")).not.toHaveClass(/hidden/, {
+		timeout: 15_000,
+	});
+
+	// La pantalla "corta" cerrando su contexto — mismo efecto que apagar
+	// la tele o cerrar la pestaña: el WS se cierra, y el server notifica
+	// al emisor con peer-left (RoomService.leave se dispara igual desde
+	// el handler de "close" que desde un "leave" explicito).
+	await screenCtx.close();
+
+	await expect(sender.getByText("The screen ended the session")).toBeVisible({
+		timeout: 10_000,
+	});
+	await expect(sender.getByText("Share screen")).not.toBeVisible();
+
+	await sender.getByText("Back to start").click();
+	await expect(sender.getByText("Be the screen")).toBeVisible();
+	expect(new URL(sender.url()).search).toBe("");
+
 	await senderCtx.close();
 });
 

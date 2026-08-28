@@ -20,6 +20,15 @@ function initialRoute(): Route {
 export function App() {
 	const [route, setRoute] = useState<Route>(initialRoute);
 
+	// La sala de un SenderView saliente ya no existe (RoomService.leave la
+	// borra siempre, sea quien sea quien la termine) — quitar el ?code= de
+	// la URL para que un refresco no la reintente sola. Ver el bug de "el
+	// emisor no se entera de que la sala ha terminado".
+	function goHome() {
+		window.history.replaceState({}, "", "/");
+		setRoute({ kind: "home" });
+	}
+
 	return (
 		<I18nProvider>
 			{route.kind === "home" && (
@@ -30,10 +39,7 @@ export function App() {
 			)}
 			{route.kind === "screen" && <ScreenView />}
 			{route.kind === "sender" && (
-				<SenderView
-					initialCode={route.code}
-					onExit={() => setRoute({ kind: "home" })}
-				/>
+				<SenderView initialCode={route.code} onExit={goHome} />
 			)}
 		</I18nProvider>
 	);
