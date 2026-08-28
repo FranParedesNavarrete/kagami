@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/.turbo
+spike
+docs
+*.md
+!README.md
+.git

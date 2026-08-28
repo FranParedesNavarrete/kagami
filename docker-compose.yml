@@ -1,0 +1,13 @@
+name: kagami
+
+services:
+  kagami:
+    build: .
+    image: kagami:latest
+    restart: unless-stopped
+    ports:
+      # Solo 127.0.0.1 (SPECS.md §6 / CODESTYLE.md §5): Caddy es la unica
+      # puerta hacia fuera.
+      - "127.0.0.1:7421:7421"
+    environment:
+      KAGAMI_PORT: "7421"
