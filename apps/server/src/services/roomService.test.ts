@@ -85,6 +85,17 @@ describe("RoomService", () => {
 		});
 	});
 
+	it("relays a restart-ice request from the screen to the sender", () => {
+		const rooms = new RoomService();
+		const sender = fakePeer();
+		const { code } = rooms.createRoom(fakePeer());
+		rooms.joinRoom(code, sender);
+
+		rooms.relay(code, "screen", { type: "restart-ice" });
+
+		expect(sender.send).toHaveBeenCalledWith({ type: "restart-ice" });
+	});
+
 	it("relays a message from the screen to the sender", () => {
 		const rooms = new RoomService();
 		const sender = fakePeer();

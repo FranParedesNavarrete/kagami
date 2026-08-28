@@ -36,6 +36,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("answer"), sdp: sdpSchema }),
 	z.object({ type: z.literal("ice"), candidate: iceCandidateSchema }),
 	z.object({ type: z.literal("leave") }),
+	z.object({ type: z.literal("restart-ice") }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
@@ -52,6 +53,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("answer"), sdp: sdpSchema }),
 	z.object({ type: z.literal("ice"), candidate: iceCandidateSchema }),
 	z.object({ type: z.literal("peer-left") }),
+	z.object({ type: z.literal("restart-ice") }),
 	z.object({
 		type: z.literal("error"),
 		code: z.enum([

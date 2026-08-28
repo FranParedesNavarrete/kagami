@@ -42,6 +42,12 @@ describe("ClientMessageSchema", () => {
 			ClientMessageSchema.safeParse({ type: "join-room", code: "bad" }).success,
 		).toBe(false);
 	});
+
+	it("accepts restart-ice with no payload", () => {
+		expect(ClientMessageSchema.safeParse({ type: "restart-ice" }).success).toBe(
+			true,
+		);
+	});
 });
 
 describe("ServerMessageSchema", () => {
@@ -70,5 +76,11 @@ describe("ServerMessageSchema", () => {
 				message: "nope",
 			}).success,
 		).toBe(false);
+	});
+
+	it("accepts restart-ice with no payload", () => {
+		expect(ServerMessageSchema.safeParse({ type: "restart-ice" }).success).toBe(
+			true,
+		);
 	});
 });

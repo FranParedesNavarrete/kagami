@@ -82,6 +82,9 @@ export function registerSignaling(
 					if (code && role)
 						rooms.relay(code, role, { type: "ice", candidate: msg.candidate });
 					break;
+				case "restart-ice":
+					if (code && role) rooms.relay(code, role, { type: "restart-ice" });
+					break;
 				case "leave":
 					if (code && role) rooms.leave(code, role);
 					code = null;
