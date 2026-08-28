@@ -10,7 +10,7 @@
     "dev:web": "pnpm --filter @kagami/web dev",
     "build": "pnpm --filter @kagami/shared build && pnpm --filter @kagami/web build && pnpm --filter @kagami/server build",
     "test": "pnpm --filter @kagami/shared test && pnpm --filter @kagami/server test && pnpm --filter @kagami/web test",
-    "e2e": "pnpm --filter @kagami/server e2e",
+    "e2e": "pnpm run build && pnpm --filter @kagami/server e2e",
     "lint": "biome check .",
     "format": "biome check --write ."
   },

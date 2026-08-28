@@ -127,7 +127,10 @@ export function ScreenView() {
 
 					{state.phase === "code" && (
 						<>
-							<p className="font-mono text-9xl font-bold tracking-widest">
+							<p
+								data-testid="room-code"
+								className="font-mono text-9xl font-bold tracking-widest"
+							>
 								{state.code}
 							</p>
 							<QrCode value={senderUrl(state.code)} size={220} />
