@@ -8,10 +8,11 @@
 
 Servidor Node de un fichero (`spike/server.mjs`) que sirve `spike/public/`
 por HTTP plano en el puerto 7421 y hace de señalización WS (`/ws`) para las
-seis pruebas. Verificado en local (Chromium headless, dos contextos
-simulando tele+emisor con `--use-fake-device-for-media-stream`): las seis
-pruebas automatizables pasan. Lo que sigue sin verificar es exactamente lo
-que M-1 existe para responder: si el Chromium de webOS hace lo mismo.
+seis pruebas. Verificado primero en local (Chromium headless, dos contextos
+simulando tele+emisor con `--use-fake-device-for-media-stream`) y despues
+en campo (Mac + iPhone). Ejecutado ya en la LG real — ver resultados
+abajo: cinco de seis pruebas en verde, falta cerrar el diagnostico de la
+sexta y el juicio a ojo de la estabilidad.
 
 ## Cómo ejecutarlo
 
@@ -39,23 +40,37 @@ que M-1 existe para responder: si el Chromium de webOS hace lo mismo.
 
 ## Resultado
 
-**User agent de la tele**: _(pendiente — copiar el texto tal cual lo
-muestra la pantalla)_
+**User agent de la tele**:
+```
+Mozilla/5.0 (Linux; NetCast; U) AppleWebKit/537.36 (KHTML, like Gecko)
+Chrome/120.0.0.0 Safari/537.36 SmartTV/10.0 Colt/2.0
+```
+(El token "NetCast" es un resto legacy que LG mantiene en el UA incluso
+en TVs webOS actuales — Chrome/120 confirma que el motor es un Chromium
+razonablemente moderno, no el NetCast real de antes de 2014.)
 
 | # | Prueba | Resultado | Detalle |
 |---|---|---|---|
-| 1 | WebSocket: conectar + eco + reconexión (30 s) | ⬜ Pendiente [humano] | |
-| 2 | RTCPeerConnection recvonly — H.264 | ⬜ Pendiente [humano] | |
-| 3 | RTCPeerConnection recvonly — VP8 | ⬜ Pendiente [humano] | |
-| 4 | `<video>` HTTP con range requests (salto a mitad) | ⬜ Pendiente [humano] | |
-| 5 | Autoplay sin interacción | ⬜ Pendiente [humano] | |
-| 6 | Estabilidad, 10 min conectado | ⬜ Pendiente [humano] | fotogramas perdidos: _, RTT WS avg/max: _, picos >200ms: _ |
+| 1 | WebSocket: conectar + eco + reconexión (30 s) | ✅ Pass | connect 17ms, reconnect+echo 5ms |
+| 2 | RTCPeerConnection recvonly — H.264 | ✅ Pass | |
+| 3 | RTCPeerConnection recvonly — VP8 | ✅ Pass | |
+| 4 | `<video>` HTTP con range requests (salto a mitad) | ❌ Fail | sigue en rojo tras el fix de adjuntar el video al DOM (commit `1792b78`) — pendiente ver el texto exacto del detalle para diagnosticar mejor |
+| 5 | Autoplay sin interacción | ✅ Pass | |
+| 6 | Estabilidad, 10 min conectado | ✅ Pass (dato) / ⬜ Pendiente juicio a ojo | fotogramas perdidos: 3942/5871 (67%), RTT WS avg/max: 8ms/35ms, picos >200ms: 0 |
+
+**Nota sobre la prueba 6**: la señal de red (RTT del WS) es excelente y
+sin picos — contradice, para esta corrida, la hipótesis de que los picos
+ICMP de ~700ms (ver cabecera de ROADMAP.md) afectan al vídeo. El 67% de
+fotogramas perdidos es otra cosa: apunta a que el decodificador/renderer
+de la tele no da abasto con el stream WebRTC, no a la red. Falta el
+juicio a ojo (¿se vio fluido o iba a tirones?) para saber si es aceptable.
 
 ## Veredicto de la puerta
 
-_(pendiente — ver ROADMAP.md M-1: "WebRTC recvonly funciona en la tele y
-la estabilidad de 10 minutos es aceptable a ojo". Si falla o tartamudea
-sin remedio, SPECS.md se actualiza hacia cast-only ANTES de tocar M0.)_
+_(pendiente el juicio a ojo de la prueba 6 — ver arriba. El núcleo de la
+puerta, "WebRTC recvonly funciona en la tele", está cumplido: H.264 y
+VP8 conectan y hay vídeo. Lo que falta decidir es si el 67% de
+fotogramas perdidos es "tartamudea sin remedio" o no.)_
 
 ## Notas para quien lo ejecute
 
