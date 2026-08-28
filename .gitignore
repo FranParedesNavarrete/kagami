@@ -1,0 +1,75 @@
+# ---------------------------------------------------------------- markdown
+# Politica del repo: los .md de trabajo no se publican; solo el README.
+# OJO: CODESTYLE.md esta exceptuado porque los agentes que escriben codigo
+# lo leen DESDE el repo clonado: si no viaja, no gobierna nada.
+# Cuando existan CLA.md / SECURITY.md / CONTRIBUTING.md, anadirlos aqui como
+# excepciones tambien: sin CLA visible no hay CLA que firmar.
+# docs/mediciones.md tambien exceptuado (Cierre de M0, punto 7): es la
+# evidencia de que las puertas de M-1/M0 se cumplieron, medida de verdad;
+# sin trackear solo existia en el filesystem de quien la escribio.
+# docs/mcp-design.md exceptuado por el mismo motivo que CODESTYLE.md: es el
+# diseno de apps/api/src/mcp/ que ROADMAP M1 exige "antes que codigo" — si
+# no viaja con el repo, la proxima sesion no sabe por que esta hecho asi.
+# docs/registro-nocturno.md exceptuado: registro cronologico de una sesion
+# nocturna sin supervision — es lo primero que se lee por la manana, no
+# puede existir solo en el filesystem de quien lo escribio.
+# ROADMAP.md exceptuado: descubierto 2026-08-27 que nunca habia estado
+# trackeado pese a llevar semanas de checkboxes/puertas reales editados
+# solo en el filesystem de quien lo escribio — el mismo motivo que
+# docs/mediciones.md, y el propio encargo nocturno exige mantenerlo al dia.
+# docs/transcript-2026-08-27.md exceptuado: la base real de los casos
+# nuevos de scripts/suites/v2Suite.ts (encargo "camino hibrido", Bloque
+# 3) — sin trackear, la proxima sesion no sabria por que existen esos
+# casos concretos.
+*.md
+!README.md
+!CODESTYLE.md
+!CLA.md
+!CONTRIBUTING.md
+!SECURITY.md
+!HANDOFF.md
+!ROADMAP.md
+!docs/mediciones.md
+!docs/mcp-design.md
+!docs/registro-nocturno.md
+!docs/transcript-2026-08-27.md
+
+# ---------------------------------------------------------------- node
+node_modules/
+dist/
+build/
+.pnpm-store/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------- entorno
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------- datos locales
+data/
+*.sqlite
+*.sqlite-journal
+*.db
+
+# ---------------------------------------------------------------- tests
+coverage/
+playwright-report/
+test-results/
+.e2e-data/
+
+# ---------------------------------------------------------------- mediciones
+# Transcripciones crudas de scripts/measureToolCalling.ts (encargo "camino
+# híbrido", Bloque 2): datos de una corrida concreta, no código ni
+# documentación — el resumen con juicio ya anotado va a docs/mediciones.md,
+# igual que todas las rondas anteriores de esta noche.
+apps/api/measurements/
+
+# ---------------------------------------------------------------- sistema
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------- ide
+.idea/
+.vscode/
+!.vscode/extensions.json
