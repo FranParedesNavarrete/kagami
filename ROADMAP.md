@@ -13,23 +13,25 @@
 
 ## M-1 · La tele decide (spike, sin app todavia)
 
-- [ ] Servidor minimo (un fichero) que sirve `spike/` por HTTP plano en
+- [x] Servidor minimo (un fichero) que sirve `spike/` por HTTP plano en
       el puerto 7421 y hace de señalizacion WS para la prueba.
-- [ ] Pagina receptora para la tele: muestra en grande el user agent de
+- [x] Pagina receptora para la tele: muestra en grande el user agent de
       webOS y el resultado de cada prueba (verde/rojo, letra enorme).
-- [ ] Pagina emisora para el Mac: genera un stream de prueba (canvas con
+- [x] Pagina emisora para el Mac: genera un stream de prueba (canvas con
       reloj en ms) y lo manda por WebRTC.
-- [ ] Pruebas que ejecuta la pagina de la tele:
-      - [ ] WebSocket: conectar, eco, reconexion tras 30 s de pausa.
-      - [ ] RTCPeerConnection recvonly con H.264.
-      - [ ] RTCPeerConnection recvonly con VP8.
-      - [ ] `<video>` reproduciendo un mp4 por HTTP con range requests
+- [x] Pruebas que ejecuta la pagina de la tele (construidas y verificadas
+      en local con Chromium headless; pendiente correrlas en la tele real):
+      - [x] WebSocket: conectar, eco, reconexion tras 30 s de pausa.
+      - [x] RTCPeerConnection recvonly con H.264.
+      - [x] RTCPeerConnection recvonly con VP8.
+      - [x] `<video>` reproduciendo un mp4 por HTTP con range requests
             (saltar a mitad debe funcionar).
-      - [ ] Autoplay: ¿arranca el video sin toque, o exige interaccion?
-      - [ ] Estabilidad 10 minutos: latencia percibida (reloj del emisor
+      - [x] Autoplay: ¿arranca el video sin toque, o exige interaccion?
+      - [x] Estabilidad 10 minutos: latencia percibida (reloj del emisor
             visible en la tele) y cortes contados. Esta prueba responde a
             si los picos ICMP afectan al video real o no.
-- [ ] `docs/spike-tv.md` con la tabla de resultados y el user agent.
+- [x] `docs/spike-tv.md` con la tabla de resultados y el user agent
+      (plantilla + instrucciones listas; la tabla la rellena el humano).
 - [ ] **[humano]** Ejecutar el spike en la LG con Fran delante.
 
 **Puerta**: WebRTC recvonly funciona en la tele y la estabilidad de 10
