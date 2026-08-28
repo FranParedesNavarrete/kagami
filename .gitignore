@@ -1,25 +1,10 @@
 # ---------------------------------------------------------------- markdown
 # Politica del repo (CODESTYLE.md §6): los .md de trabajo (SPECS.md,
-# HANDOFF.md...) no se publican, viajan por el chat; solo estos se trackean.
-# CODESTYLE.md esta exceptuado porque los agentes que escriben codigo lo
-# leen DESDE el repo clonado: si no viaja, no gobierna nada.
-# ROADMAP.md exceptuado: es el checklist de puertas real, con casillas que
-# se editan sesion a sesion — sin trackear solo existiria en el filesystem
-# de quien lo escribio.
-# docs/spike-tv.md exceptuado (M-1): es la evidencia de que la puerta del
-# spike se cumplio, medida de verdad — sin trackear solo existiria en el
-# filesystem de quien lo ejecuto.
-# docs/registro.md exceptuado: registro de sesion que exige ROADMAP.md, es
-# lo primero que se lee al retomar el proyecto.
+# ROADMAP.md, CODESTYLE.md, HANDOFF.md, docs/*.md...) no se publican,
+# viajan por el chat o quedan solo en el disco local. Unica excepcion:
+# README.md, la cara publica del proyecto.
 *.md
 !README.md
-!CODESTYLE.md
-!ROADMAP.md
-!HANDOFF.md
-!CONTRIBUTING.md
-!SECURITY.md
-!docs/spike-tv.md
-!docs/registro.md
 
 # ---------------------------------------------------------------- node
 node_modules/
