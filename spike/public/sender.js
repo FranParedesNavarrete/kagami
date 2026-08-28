@@ -55,6 +55,14 @@ function connectWs() {
 // sessionId identifica cada intento: si el humano lanza H.264 y luego VP8
 // sin esperar, un ICE candidate tardio del primero no se debe aplicar al
 // RTCPeerConnection del segundo (ver mismo mecanismo en screen.js).
+// No usamos crypto.randomUUID(): la Web Crypto API solo existe en contexto
+// seguro (HTTPS o localhost), y esta pagina se abre por IP de LAN en HTTP
+// plano a proposito (SPECS.md §4.4) — necesitaba solo un id de correlacion,
+// no aleatoriedad criptografica.
+function genSessionId() {
+	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 let activeSession = null; // { id, pc, pending }
 
 function addOrQueueIce(session, candidate) {
@@ -86,7 +94,7 @@ async function runTest(codec) {
 
 	if (activeSession) activeSession.pc.close();
 	const pc = new RTCPeerConnection({ iceServers: [] });
-	const sessionId = crypto.randomUUID();
+	const sessionId = genSessionId();
 	activeSession = { id: sessionId, pc, pending: [] };
 
 	pc.onconnectionstatechange = () => {
