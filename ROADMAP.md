@@ -44,28 +44,32 @@ diseñado, ver `docs/spike-tv.md`.
 
 ## M0 · Espejo de escritorio → tele
 
-- [ ] Monorepo pnpm (`apps/server`, `apps/web`, `packages/shared`) segun
+- [x] Monorepo pnpm (`apps/server`, `apps/web`, `packages/shared`) segun
       CODESTYLE; mensajes de señalizacion tipados con zod en shared.
-- [ ] Salas en memoria: codigo de 4 caracteres alfanumericos del alfabeto
+- [x] Salas en memoria: codigo de 4 caracteres alfanumericos del alfabeto
       sin ambiguas `234679ACDEFGHJKMNPQRTUVWXYZ` (SPECS §6), un solo uso,
       caduca a los 10 min sin emparejar; emparejada no admite mas emisores.
-- [ ] Señalizacion WS completa (join/offer/answer/ice/leave) con tests.
-- [ ] Vista pantalla (HTTP plano, sin APIs de contexto seguro): codigo en
+- [x] Señalizacion WS completa (join/offer/answer/ice/leave) con tests.
+- [x] Vista pantalla (HTTP plano, sin APIs de contexto seguro): codigo en
       grande + QR con la URL del emisor; video a pantalla completa al
       conectar; vuelve al codigo al cortar.
-- [ ] Vista emisor (HTTPS): getDisplayMedia con seleccion de pantalla/
+- [x] Vista emisor (HTTPS): getDisplayMedia con seleccion de pantalla/
       ventana/pestaña; indicador de que se esta compartiendo y de si va
       audio; boton de cortar.
-- [ ] Deteccion honesta de capacidades: en iOS, la vista emisor explica
+- [x] Deteccion honesta de capacidades: en iOS, la vista emisor explica
       que no hay espejo de sistema y ofrece cast (M1).
-- [ ] Sin STUN/TURN: solo candidatos host (LAN/tailnet).
-- [ ] e2e Playwright: dos contextos (emisor con captura fingida via flags
+- [x] Sin STUN/TURN: solo candidatos host (LAN/tailnet).
+- [x] e2e Playwright: dos contextos (emisor con captura fingida via flags
       de Chromium, pantalla) contra el server real — sala, espejo, corte.
-- [ ] Compose de produccion publicando SOLO en 127.0.0.1:7421 +
-      documentacion de publicarlo con `casa app alta kagami 7421`.
+- [x] Compose de produccion publicando SOLO en 127.0.0.1:7421 +
+      documentacion de publicarlo con `casa app alta kagami 7421`
+      (ver README.md — construido y verificado con un contenedor real).
 - [ ] **[humano]** Puerta: 10 minutos de video espejado Mac→tele sin
       cortes, latencia medida ≤ 400 ms (metodo: reloj en ms en el emisor,
       foto a ambas pantallas, restar).
+
+**HANDOFF.md** de este milestone: estado real, mediciones, desviaciones
+y deuda en el fichero `HANDOFF.md` del repo.
 
 ## M1 · Cast
 

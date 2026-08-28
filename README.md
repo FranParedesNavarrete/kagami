@@ -45,7 +45,7 @@ git clone <repo> kagami && cd kagami
 docker compose up -d
 ```
 
-- TV: open `http://<server>:7421` → "Be a screen" → a code appears.
+- TV: open `http://<server>:7421` → "Be the screen" → a code appears.
 - Sender: open `https://kagami.your.domain` (behind your proxy), enter
   the code, share or cast.
 

@@ -1,15 +1,15 @@
 {
-  "name": "kagami-spike",
-  "private": true,
-  "type": "module",
-  "version": "0.0.0",
-  "engines": {
-    "node": ">=22"
-  },
-  "scripts": {
-    "start": "node server.mjs"
-  },
-  "dependencies": {
-    "ws": "^8.18.0"
-  }
+	"name": "kagami-spike",
+	"private": true,
+	"type": "module",
+	"version": "0.0.0",
+	"engines": {
+		"node": ">=22"
+	},
+	"scripts": {
+		"start": "node server.mjs"
+	},
+	"dependencies": {
+		"ws": "^8.18.0"
+	}
 }

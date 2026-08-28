@@ -2,6 +2,39 @@
 
 > Una entrada por sesión de agente, más reciente arriba.
 
+## 2026-08-28 — M0: monorepo completo, construido y verificado en tres capas
+
+- Actualizado SPECS.md §4.3 con el riesgo abierto del range-request de
+  M-1 (no se trackea en git — viaja por el chat, ver CODESTYLE.md §6) y
+  añadida la primera tarea de M1 en ROADMAP.md: diagnosticar eso antes
+  de construir el cast de ficheros encima.
+- Construido M0 entero de una sesión: `packages/shared` (esquemas zod +
+  codigo de sala, 10 tests), `apps/server` (Fastify + WS, RoomService
+  puro y testeable con 11 tests, 3 e2e de Playwright contra el server
+  real), `apps/web` (React+Vite+Tailwind, i18n en/es/pt con test de
+  paridad de claves, deteccion honesta de iOS).
+- Verificado en tres capas, no solo "compila": (1) Playwright contra el
+  server de Node corriendo directo, (2) mismo flujo contra el build de
+  produccion, (3) mismo flujo otra vez contra el contenedor Docker real
+  ya corriendo en 127.0.0.1. Las tres veces: sala -> codigo -> el emisor
+  entra -> comparte -> la pantalla ve el video -> cortar -> codigo nuevo.
+- Dos bugs de Docker encontrados y arreglados en el momento, no
+  reportados nunca: `pnpm@10.32.0` fijado en `packageManager` porque
+  Alpine bajaba pnpm 11 via corepack y su nueva politica de
+  "minimum release age" rechazaba paquetes publicados el mismo dia del
+  lockfile; y `*.tsbuildinfo` faltaba en `.dockerignore`, colandose una
+  cache incremental de tsc del host que hacia que `tsc -b` de
+  `packages/shared` no reemitiera los `.d.ts` dentro del contenedor.
+- El `.gitignore` volvio a cambiar solo durante esta sesion tambien (ver
+  la entrada de M-1 abajo) — se dejo en el estado que coincide con
+  CODESTYLE.md §6, sin volver a tocarlo mas alla de eso.
+- `HANDOFF.md` escrito con el estado real, mediciones, desviaciones (SPA
+  de una sola ruta con estado en vez de rutas de servidor separadas) y
+  deuda conocida (range-request aun sin resolver; sin CI real, resuelto
+  con un test).
+- La puerta humana de M0 (10 min de espejo real Mac→tele con latencia
+  medida) queda sin marcar en ROADMAP.md — no se simula.
+
 ## 2026-08-28 — M-1: spike construido y verificado en local
 
 - Repo ya tenía un commit inicial (`.gitignore`, `CODESTYLE.md`,
