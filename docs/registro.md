@@ -34,3 +34,24 @@
 - Lo que exige la tele física (todo M-1 en sí) queda sin marcar en
   ROADMAP.md — pendiente de ejecutarse con Fran delante. Ver
   `docs/spike-tv.md` para instrucciones exactas.
+- Prueba de campo real con Fran (Mac como emisor, iPhone como receptor de
+  pie mientras la tele no estaba disponible — no sustituye a M-1, el
+  iPhone no es la tele). Encontrados y arreglados dos bugs reales que el
+  smoke test local no había visto:
+  - `crypto.randomUUID()` en `sender.js` fallaba fuera de contexto
+    seguro: `http://<ip-lan>:7421` no lo es (solo HTTPS o localhost), y
+    mi smoke test solo había probado contra `localhost`. Sustituido por
+    un id de correlación sin Web Crypto.
+  - En el iPhone, la prueba de `<video>` por range requests fallaba sola
+    (las otras cinco, incluido el video WebRTC en vivo, en verde) — el
+    elemento de prueba nunca se insertaba en el DOM, y iOS Safari es
+    agresivo reteniendo recursos de video para elementos así. Reproducido
+    el patrón en Chromium headless y WebKit de escritorio (ambos pasan,
+    confirma que no es el servidor ni el range-request), pero no pude
+    reproducir Safari de iOS real aquí — el fix (insertar oculto en el
+    DOM, `playsInline`) queda pendiente de reconfirmar en el propio
+    iPhone o en la tele.
+  - Dato de campo real de la prueba de estabilidad Mac→iPhone: 601 s,
+    0 fotogramas perdidos, RTT de WS avg 19 ms / max 203 ms, 1 pico
+    >200 ms. No es la puerta de M-1 (esa es con la tele), pero es la
+    primera señal de que la señalización aguanta bien en esta LAN.
