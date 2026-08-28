@@ -69,6 +69,14 @@ diseñado, ver `docs/spike-tv.md`.
 
 ## M1 · Cast
 
+- [ ] **Primera tarea, antes que nada lo demas**: diagnosticar por que la
+      tele real no sirvio `<video>` por range requests en el spike M-1
+      (ver SPECS.md §4.3, riesgo abierto, y docs/spike-tv.md). Mirar
+      cabeceras Range/Content-Range reales que llegan al server desde la
+      tele, MIME servido, y si el propio Chromium de webOS tiene alguna
+      restriccion documentada. Si no tiene arreglo razonable, replantear
+      el cast de ficheros en SPECS.md ANTES de tocar el resto de M1 —
+      no construir subida/limpieza/UI sobre una asuncion ya desmentida.
 - [ ] Cast de URL: el emisor pega un enlace (mp4/webm/HLS), la tele lo
       abre en su `<video>` nativo. Validacion de esquema http(s).
 - [ ] Controles remotos desde el emisor via WS: play/pausa/salto/volumen,
