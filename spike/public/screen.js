@@ -207,7 +207,15 @@ async function runVideoRangeTest() {
 	const video = document.createElement("video");
 	video.src = "/test-video.mp4";
 	video.muted = true;
+	video.playsInline = true;
 	video.preload = "auto";
+	// iOS Safari es agresivo reteniendo recursos de video de elementos que
+	// nunca entraron en el DOM: metadata/seek pueden no disparar nunca.
+	// Insertarlo oculto (no display:none, que en iOS tambien puede frenar
+	// la carga) es la via fiable.
+	video.style.cssText =
+		"position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;";
+	document.body.appendChild(video);
 
 	const result = await new Promise((resolve) => {
 		const timer = setTimeout(
@@ -234,6 +242,7 @@ async function runVideoRangeTest() {
 		});
 	});
 
+	video.remove();
 	setStatus("video-range", result.ok ? "pass" : "fail", result.reason);
 }
 
