@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>kagami spike — sender</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <h1>kagami — M-1 spike</h1>
+  <p class="subtitle">Sender (Mac). Open the TV page first, then run each codec test.</p>
+
+  <canvas id="clock" width="640" height="360"></canvas>
+
+  <div>
+    <button id="btn-h264">Run H.264 test</button>
+    <button id="btn-vp8">Run VP8 test</button>
+  </div>
+
+  <p class="test-detail" id="status">idle</p>
+  <div class="log" id="log"></div>
+
+  <script src="/sender.js"></script>
+</body>
+</html>
