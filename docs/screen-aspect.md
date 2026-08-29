@@ -207,3 +207,66 @@ screen-aspect.spec.ts`, nuevo fichero, sustituye el test de aspecto de
   `<video>` de espejo sigue en el DOM pero con
   `getBoundingClientRect() === {width: 0, height: 0}` — oculto de
   verdad, no solo "detrás" de otra cosa.
+
+## Controles nativos sin tematizar: una clase de fallo que la auditoría de colores no puede ver (2026-08-29)
+
+Mismo género de problema que el resto de este documento — algo que
+pinta el navegador o el sistema operativo, fuera del alcance normal del
+CSS — pero en los controles del emisor, no en el vídeo de la tele.
+
+**El bug real que lo destapó**: la barra de volumen de
+`PlaybackControls.tsx` se pintaba con el azul de acento por defecto del
+sistema, visible en `docs/media/cast-phone.jpg` junto a la barra de
+tiempo (ya tematizada). La auditoría de "ningún color fuera de los
+tokens" (encargo de depuración final) no lo detectó porque no hay
+ningún literal que buscar: un `<input type="range">` sin `accent-color`
+propio hereda el azul de acento del sistema, y ese heredar no deja
+rastro en el CSS del proyecto.
+
+**Arreglado** (`apps/web/src/index.css`): `accent-color: var(--color-glass)`
+en `input[type="range"], input[type="checkbox"], input[type="radio"],
+progress` (ninguno de los tres últimos existe hoy, pero es la misma
+clase de fallo si algún día aparecen), y `background-color:
+var(--color-silver)` en los pseudo-elementos del tirador que ya
+estaban. Las tres variables (`--color-ink`, `--color-silver`,
+`--color-glass`) son la primera vez que los tokens de
+`tailwind.config.js` existen también como propiedades CSS reales, no
+solo como clases de Tailwind — necesario porque `accent-color` no
+puede leer la config de Tailwind, igual que ya pasaba con el `body` y
+el anillo de foco de más arriba en este mismo fichero.
+
+**Encontrado de paso, mismo origen (heredar del sistema, no un
+literal)**: el input de la URL de cast (`cast-url-input`,
+`SenderView.tsx`) llevaba `focus:outline-none` — pensado para
+reemplazar el anillo por un cambio de color de borde, pero
+`focus:outline-none` actúa en `:focus` mientras que el anillo global
+vive en `:focus-visible` (`index.css`); al tener la misma
+especificidad y declararse después en la cascada, `:focus` ganaba y
+el anillo desaparecía para quien navega por teclado en ese input
+concreto — el único de toda la app. Quitado; el input se queda solo
+con el cambio de borde en foco, y el anillo global vuelve a aplicar.
+
+**Lo que queda sin arreglo posible, documentado en vez de escondido**:
+el único `<select>` de la app (selector de dispositivo de audio,
+`SenderView.tsx`) tiene el fondo/borde/texto tematizados, pero su
+flecha y la lista desplegable son pintadas enteras por el sistema
+operativo — ninguna propiedad CSS estándar llega ahí (`accent-color`
+no se aplica a `<select>`, solo a checkbox/radio/range/progress), y
+lo único que lo resolvería de verdad es reconstruir el control entero
+con un `<div>`/`<ul>` a medida en vez de un `<select>` nativo. Deuda
+aceptada a propósito: el coste de esa reconstrucción no está
+justificado por un elemento que aparece una vez, en un desplegable
+secundario.
+
+**Cómo se detecta esta clase de fallo a partir de ahora**: como no hay
+ningún color literal que buscar con un grep, hace falta comprobar el
+estilo computado de verdad, no el código fuente.
+`apps/server/e2e/cast.spec.ts` ("the volume and seek sliders are
+themed...") comprueba `getComputedStyle(el).accentColor` contra el
+valor real de `--glass` en los dos sliders del cast, así que un
+`accent-color` que se vuelva a perder falla el e2e, no solo se cuela
+en una captura. `apps/web/src/a11yLint.test.ts` hace lo equivalente
+para `focus:outline-none`: escanea el código fuente en busca de esa
+combinación exacta y falla si aparece, ya que ese caso sí es
+detectable como texto (a diferencia de un color heredado, que no lo
+es).

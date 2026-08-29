@@ -917,7 +917,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 													value={castUrlInput}
 													onChange={(e) => setCastUrlInput(e.target.value)}
 													placeholder={t("sender.castUrlPlaceholder")}
-													className="w-full rounded-md border border-line bg-ink-2 px-3.5 py-3 text-sm text-silver placeholder:text-faint focus:border-line-2 focus:outline-none"
+													className="w-full rounded-md border border-line bg-ink-2 px-3.5 py-3 text-sm text-silver placeholder:text-faint focus:border-line-2"
 												/>
 												<p className="text-xs text-faint">
 													{t("sender.castUrlHint")}

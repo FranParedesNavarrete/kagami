@@ -305,3 +305,45 @@ test("an unreachable/unsupported cast URL shows a playback error on both sides",
 	await screenCtx.close();
 	await senderCtx.close();
 });
+
+test("the volume and seek sliders are themed, not left at the browser's default accent color", async ({
+	browser,
+}) => {
+	// Regresion (encargo "el azul del control de volumen"): un
+	// <input type="range"> sin accent-color hereda el azul de acento del
+	// sistema, y como no es un literal en el CSS, la auditoria de "ningun
+	// color fuera de los tokens" no lo detecta — ver docs/screen-aspect.md,
+	// "Controles nativos sin tematizar". Este test comprueba el valor
+	// computado de verdad, no una clase de Tailwind.
+	const screenCtx = await browser.newContext();
+	const senderCtx = await browser.newContext();
+	const screen = await screenCtx.newPage();
+	const sender = await senderCtx.newPage();
+
+	await screen.route(CAST_URL, fulfillWithRangeSupport);
+	await screen.goto("/");
+	await screen.getByText("Show code").click();
+	const code = (await screen.getByTestId("room-code").innerText()).trim();
+
+	await sender.goto(`/?code=${code}`);
+	await sender.getByText("Cast", { exact: true }).click();
+	await sender.getByTestId("cast-url-input").fill(CAST_URL);
+	await sender.getByTestId("cast-url-submit").click();
+
+	await expect(sender.getByTestId("cast-seek")).toBeVisible({
+		timeout: 10_000,
+	});
+
+	// rgb(111, 217, 185) es --glass (#6FD9B9, tailwind.config.js) — el
+	// valor por defecto del navegador es "auto" (o azul segun plataforma),
+	// nunca este valor exacto por casualidad.
+	for (const testId of ["cast-seek", "cast-volume"]) {
+		const accentColor = await sender
+			.getByTestId(testId)
+			.evaluate((el) => getComputedStyle(el).accentColor);
+		expect(accentColor).toBe("rgb(111, 217, 185)");
+	}
+
+	await screenCtx.close();
+	await senderCtx.close();
+});

@@ -3,6 +3,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Duplicado de tailwind.config.js a proposito (encargo "el azul del
+   control de volumen"): el CSS plano de fuera de Tailwind no puede
+   leer su config JS, asi que estas tres son la unica forma de que un
+   selector nativo (accent-color, el body antes de que React monte)
+   use el mismo valor que bg-ink/text-silver/text-glass en vez de un
+   literal suelto y potencialmente desincronizado. */
+:root {
+	--color-ink: #0a0e0d;
+	--color-silver: #e9efec;
+	--color-glass: #6fd9b9;
+}
+
 /* Rediseño visual: sin subrayados globales (encargo, parte 3) — los
    enlaces se distinguen por color (--glass, texto --silver en hover),
    nunca por decoracion de texto. */
@@ -11,20 +23,37 @@ a {
 }
 
 body {
-	background-color: #0a0e0d;
-	color: #e9efec;
+	background-color: var(--color-ink);
+	color: var(--color-silver);
 	font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 /* Pointer en todo lo pulsable (encargo, parte 4): las pistas de las
    barras de progreso/volumen dan pointer, el tirador (thumb) da grab/
    grabbing y crece ligeramente en hover — Chrome/Safari exigen
-   prefijo -webkit- para estilar el thumb de un <input type="range">. */
+   prefijo -webkit- para estilar el thumb de un <input type="range">.
+   Color (encargo "el azul del control de volumen"): sin accent-color,
+   un <input type="range"> sin relleno estilado hereda el azul de
+   acento del sistema — no aparece como ningun literal en este fichero,
+   asi que la auditoria de "ningun color fuera de los tokens" no lo
+   detecta (ver docs/screen-aspect.md, "Controles nativos sin
+   tematizar"). accent-color tematiza el relleno Y el tirador con el
+   mismo valor en Chrome/Firefox; el fondo explicito del tirador de
+   abajo lo acerca a --silver donde el navegador lo permite. Mismo
+   selector para checkbox/radio/progress: no hay ninguno hoy, pero es
+   la misma clase de fallo si algun dia aparecen. */
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"],
+progress {
+	accent-color: var(--color-glass);
+}
 input[type="range"] {
 	cursor: pointer;
 }
 input[type="range"]::-webkit-slider-thumb {
 	cursor: grab;
+	background-color: var(--color-silver);
 	transition: transform 0.15s ease;
 }
 input[type="range"]:active::-webkit-slider-thumb {
@@ -35,6 +64,7 @@ input[type="range"]:hover::-webkit-slider-thumb {
 }
 input[type="range"]::-moz-range-thumb {
 	cursor: grab;
+	background-color: var(--color-silver);
 	transition: transform 0.15s ease;
 }
 input[type="range"]:active::-moz-range-thumb {
@@ -52,7 +82,7 @@ summary {
    de 2px en --glass con 3px de separacion, nunca el outline por
    defecto del navegador ni "nada". */
 :focus-visible {
-	outline: 2px solid #6fd9b9;
+	outline: 2px solid var(--color-glass);
 	outline-offset: 3px;
 }
 
