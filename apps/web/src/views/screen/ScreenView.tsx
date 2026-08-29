@@ -163,6 +163,11 @@ export function ScreenView() {
 			durationSec: Number.isFinite(video.duration) ? video.duration : null,
 			paused: video.paused,
 			ended: video.ended,
+			// El server guarda el ultimo cast-status para poder devolverselo
+			// al emisor si reconecta tras bloquear el telefono (SPECS.md §6)
+			// — sin esto, un reconectado veria el volumen a un valor
+			// inventado en vez del real de la tele.
+			volume: video.volume,
 			errorMessage: castErrorRef.current,
 		});
 	}, [send]);
@@ -302,6 +307,24 @@ export function ScreenView() {
 						});
 						break;
 
+					case "cast-file-ready":
+						// Igual que "cast-url", pero el path es relativo: el emisor
+						// pudo subir por un host distinto (HTTPS, detras de un
+						// dominio), la pantalla siempre resuelve contra su propio
+						// origen (SPECS.md §4.4 — HTTP plano, mismo server real).
+						stopStatsWatcher();
+						sessionRef.current?.pc.close();
+						sessionRef.current = null;
+						if (videoRef.current) videoRef.current.srcObject = null;
+						castErrorRef.current = null;
+						setState({
+							phase: "casting",
+							url: new URL(msg.path, location.origin).toString(),
+							needsInteraction: false,
+							errorKind: null,
+						});
+						break;
+
 					case "cast-play":
 						castVideoRef.current?.play().catch(() => {
 							setState((prev) =>
@@ -330,17 +353,34 @@ export function ScreenView() {
 						break;
 
 					case "peer-left":
-						// Es justo la ventaja del cast frente al espejo (SPECS.md §2):
-						// el emisor puede desconectarse (bloquear el telefono) sin que
-						// el video se detenga — vive solo en el <video> de la tele, no
-						// depende de que el WS del emisor siga vivo. El control remoto
-						// se pierde hasta que alguien entre con un codigo nuevo, pero
-						// la reproduccion sigue.
+						// Es justo la ventaja del cast frente al espejo (SPECS.md §2 y
+						// §6): el emisor puede desconectarse (bloquear el telefono) sin
+						// que el video se detenga — vive solo en el <video> de la tele,
+						// no depende de que el WS del emisor siga vivo. La sala queda
+						// "pantalla sola" en el server (hasta 30 min, SPECS.md §6): el
+						// MISMO codigo puede reconectar y recuperar el control. Si nadie
+						// lo hace a tiempo, llega "screen-alone-expired" aparte — eso si
+						// hay que atenderlo.
 						if (phaseRef.current === "casting") break;
 						stopStatsWatcher();
 						sessionRef.current?.pc.close();
 						sessionRef.current = null;
 						if (videoRef.current) videoRef.current.srcObject = null;
+						setState({ phase: "connecting" });
+						send({ type: "create-room" });
+						break;
+
+					case "screen-alone-expired":
+						// Se acabaron los 30 min de "pantalla sola" sin que nadie
+						// reconectara — esta vez la sala si murio de verdad, a
+						// diferencia de "peer-left" durante el cast (que se ignora
+						// arriba a proposito).
+						stopStatsWatcher();
+						sessionRef.current?.pc.close();
+						sessionRef.current = null;
+						if (videoRef.current) videoRef.current.srcObject = null;
+						if (castVideoRef.current) castVideoRef.current.src = "";
+						castErrorRef.current = null;
 						setState({ phase: "connecting" });
 						send({ type: "create-room" });
 						break;

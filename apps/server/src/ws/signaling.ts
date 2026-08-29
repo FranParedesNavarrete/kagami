@@ -68,6 +68,16 @@ export function registerSignaling(
 					code = msg.code;
 					role = "sender";
 					send({ type: "room-joined" });
+					// Reconexion a una sala que quedo "pantalla sola" durante un
+					// cast (SPECS.md §6): antes que nada mas, decirle al emisor
+					// que reconecto que hay algo en marcha y en que punto va —
+					// nunca dejarlo mostrando datos inventados.
+					if (result.resumed) {
+						send({ type: "cast-resumed", label: result.resumed.label });
+						if (result.resumed.status) {
+							send({ type: "cast-status", ...result.resumed.status });
+						}
+					}
 					break;
 				}
 				case "offer":
@@ -93,8 +103,10 @@ export function registerSignaling(
 						});
 					break;
 				case "cast-url":
-					if (code && role)
+					if (code && role) {
 						rooms.relay(code, role, { type: "cast-url", url: msg.url });
+						rooms.markCasting(code, msg.url);
+					}
 					break;
 				case "cast-play":
 					if (code && role) rooms.relay(code, role, { type: "cast-play" });
@@ -124,6 +136,7 @@ export function registerSignaling(
 							durationSec: msg.durationSec,
 							paused: msg.paused,
 							ended: msg.ended,
+							volume: msg.volume,
 							errorMessage: msg.errorMessage,
 						});
 					break;

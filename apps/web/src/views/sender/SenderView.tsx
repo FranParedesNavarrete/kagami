@@ -82,6 +82,7 @@ interface CastPlaybackState {
 	durationSec: number | null;
 	paused: boolean;
 	ended: boolean;
+	volume: number;
 	errorMessage: string | null;
 }
 
@@ -91,6 +92,7 @@ const EMPTY_CAST_STATE: CastPlaybackState = {
 	durationSec: null,
 	paused: true,
 	ended: false,
+	volume: 1,
 	errorMessage: null,
 };
 
@@ -391,8 +393,20 @@ export function SenderView({ initialCode, onExit }: Props) {
 							durationSec: msg.durationSec,
 							paused: msg.paused,
 							ended: msg.ended,
+							volume: msg.volume,
 							errorMessage: msg.errorMessage,
 						}));
+						break;
+					case "cast-resumed":
+						// Reconexion tras bloquear el telefono durante un cast
+						// (SPECS.md §6): la sala sobrevivio en el server con la
+						// pantalla sola ("room-joined", justo antes de este mensaje,
+						// ya puso la fase en "ready"). El "cast-status" con los datos
+						// reales (nunca inventados) llega justo despues de este. Forzar
+						// el modo "cast" tambien: un Mac reconectando por defecto
+						// arrancaria en "mirror" y no veria los controles.
+						setSenderMode("cast");
+						setCastStatus({ ...EMPTY_CAST_STATE, url: msg.label });
 						break;
 					case "answer":
 						sessionRef.current?.setRemoteDescription(msg.sdp);
@@ -787,7 +801,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 													min={0}
 													max={1}
 													step={0.01}
-													defaultValue={1}
+													value={castStatus.volume}
 													onChange={(e) =>
 														send({
 															type: "cast-volume",

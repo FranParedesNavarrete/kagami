@@ -142,10 +142,83 @@ describe("cast messages in ClientMessageSchema/ServerMessageSchema", () => {
 			durationSec: 120,
 			paused: false,
 			ended: false,
+			volume: 0.8,
 			errorMessage: null,
 		};
 		expect(ClientMessageSchema.safeParse(status).success).toBe(true);
 		expect(ServerMessageSchema.safeParse(status).success).toBe(true);
+	});
+
+	it("rejects cast-status without volume", () => {
+		const status = {
+			type: "cast-status" as const,
+			currentTimeSec: 0,
+			durationSec: null,
+			paused: true,
+			ended: false,
+			errorMessage: null,
+		};
+		expect(ServerMessageSchema.safeParse(status).success).toBe(false);
+	});
+});
+
+describe("cast-file messages (server -> client only)", () => {
+	it("accepts cast-file-processing with a percent or with null (unknown progress)", () => {
+		expect(
+			ServerMessageSchema.safeParse({
+				type: "cast-file-processing",
+				percent: 42,
+			}).success,
+		).toBe(true);
+		expect(
+			ServerMessageSchema.safeParse({
+				type: "cast-file-processing",
+				percent: null,
+			}).success,
+		).toBe(true);
+	});
+
+	it("accepts cast-file-ready with path, filename and seekMayNotWork", () => {
+		expect(
+			ServerMessageSchema.safeParse({
+				type: "cast-file-ready",
+				path: "/cast/files/A2C4/abc123.mp4",
+				filename: "movie.mp4",
+				seekMayNotWork: false,
+			}).success,
+		).toBe(true);
+	});
+
+	it("accepts cast-file-error with a message", () => {
+		expect(
+			ServerMessageSchema.safeParse({
+				type: "cast-file-error",
+				message: "file too large",
+			}).success,
+		).toBe(true);
+	});
+
+	it("accepts cast-resumed and screen-alone-expired", () => {
+		expect(
+			ServerMessageSchema.safeParse({
+				type: "cast-resumed",
+				label: "movie.mp4",
+			}).success,
+		).toBe(true);
+		expect(
+			ServerMessageSchema.safeParse({ type: "screen-alone-expired" }).success,
+		).toBe(true);
+	});
+
+	it("rejects cast-file-ready as a client message (server -> client only)", () => {
+		expect(
+			ClientMessageSchema.safeParse({
+				type: "cast-file-ready",
+				path: "/x",
+				filename: "x.mp4",
+				seekMayNotWork: false,
+			}).success,
+		).toBe(false);
 	});
 });
 
