@@ -19,7 +19,7 @@ Self-hosted. No cables, no store apps, no accounts.
      La tele mostrando el codigo de sala grande y el QR.
      Preferible FOTO del salon a captura de pantalla: vende mucho mas.
      ══════════════════════════════════════════════════════════════════ -->
-<img src="docs/media/hero.png" alt="A TV showing a kagami room code" width="100%">
+<!-- <img src="docs/media/hero.png" alt="A TV showing a kagami room code" width="100%"> -->
 
 <br>
 
@@ -117,7 +117,7 @@ diagnoses that turned out to be wrong — is in [`docs/`](docs/).
 | **End-to-end mirror latency** | **210 ms** · single sample, LAN, VP8 |
 | **Continuous run without a cut** | **15+ minutes** · 0 packets lost, 0 PLI, 0 NACK |
 | **Frame rate at native resolution** | **26 of 26** source frames encoded |
-| **Largest file cast** | **1.5 GB** · seeking instant, deletion verified |
+| **Largest file cast** | **2.6 GB** · repeated mid-film seeks, near-instant |
 | **Signalling round trip** | **4 ms** |
 
 > [!NOTE]

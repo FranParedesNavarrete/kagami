@@ -1,16 +1,20 @@
-# ---------------------------------------------------------------- markdown
-# Politica del repo (CODESTYLE.md §6): los .md de trabajo (SPECS.md,
-# ROADMAP.md, CODESTYLE.md, HANDOFF.md, docs/*.md...) no se publican,
-# viajan por el chat o quedan solo en el disco local. Unica excepcion:
-# README.md, la cara publica del proyecto.
-*.md
-!README.md
+# ---------------------------------------------------------------- registro de trabajo (CODESTYLE.md §6)
+# Politica del repo: se publica la documentacion que sirve a quien no
+# ha trabajado en el proyecto (README.md, CODESTYLE.md, SPECS.md, y
+# los docs/*.md que explican una decision o una medida); el registro
+# de trabajo se queda en local. Nombrados uno a uno, con el motivo, en
+# vez de un patron amplio: si alguien busca uno de estos, que encuentre
+# por que falta, no un silencio.
+ROADMAP.md
+HANDOFF.md
+docs/registro.md
+docs/ui-inventario.md
+docs/ui-propuesta.html
 
 # ---------------------------------------------------------------- referencia de diseño
-# Misma politica que los .md de arriba: docs/ui-propuesta.html es
-# documentacion de trabajo (la maqueta del rediseño visual), no la cara
-# publica del proyecto. Los SVG/PNG de referencia del lockup igual.
-docs/*.html
+# Activos de referencia del rediseño visual, superados por la copia ya
+# publicada en docs/media/logo-lockup.png: no sirven a quien no ha
+# trabajado en el proyecto, igual que los ficheros de arriba.
 docs/logo-lockup-*.svg
 docs/logo-lockup.png
 
