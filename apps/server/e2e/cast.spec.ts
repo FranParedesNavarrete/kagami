@@ -1,5 +1,5 @@
+import { devices, expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
 import { CAST_URL, fulfillWithRangeSupport } from "./castFixture.js";
 
 // Locator.fill() en un <input type="range"> lo trata como texto y acaba
@@ -343,6 +343,50 @@ test("the volume and seek sliders are themed, not left at the browser's default 
 			.evaluate((el) => getComputedStyle(el).accentColor);
 		expect(accentColor).toBe("rgb(111, 217, 185)");
 	}
+
+	await screenCtx.close();
+	await senderCtx.close();
+});
+
+test("iOS mirror notice hides once a cast starts and reappears on 'Play something else', with neutral (not warning) styling", async ({
+	browser,
+}) => {
+	// Encargo aprobado por Fran: el aviso era correcto antes de elegir,
+	// pero informacion caducada por delante del mando durante la
+	// reproduccion — y no deberia llevar el mismo tratamiento de alerta
+	// que el aviso de DRM, donde si hay una expectativa que se rompe.
+	const screenCtx = await browser.newContext();
+	const senderCtx = await browser.newContext({ ...devices["iPhone 13"] });
+	const screen = await screenCtx.newPage();
+	const sender = await senderCtx.newPage();
+
+	await screen.route(CAST_URL, fulfillWithRangeSupport);
+	await screen.goto("/");
+	await screen.getByText("Show code").click();
+	const code = (await screen.getByTestId("room-code").innerText()).trim();
+
+	await sender.goto(`/?code=${code}`);
+	const iosNotice = sender.getByText("No system mirror on iPhone/iPad");
+	await expect(iosNotice).toBeVisible();
+
+	// Tratamiento informativo, no de alerta: borde en --muted (#7A8B86),
+	// nunca en --amber (#E8C57A, reservado al aviso de DRM).
+	const alertBox = sender.locator('[role="alert"]', {
+		hasText: "No system mirror on iPhone/iPad",
+	});
+	await expect(alertBox).toHaveCSS("border-color", "rgba(122, 139, 134, 0.3)");
+
+	// En iOS solo hay cast, sin selector de modo — se va derecho a la
+	// pantalla de cast.
+	await sender.getByTestId("cast-url-input").fill(CAST_URL);
+	await sender.getByTestId("cast-url-submit").click();
+	await expect(sender.getByTestId("cast-seek")).toBeVisible({
+		timeout: 10_000,
+	});
+	await expect(iosNotice).toBeHidden();
+
+	await sender.getByText("Play something else").click();
+	await expect(iosNotice).toBeVisible();
 
 	await screenCtx.close();
 	await senderCtx.close();

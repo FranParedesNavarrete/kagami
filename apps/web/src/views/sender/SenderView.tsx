@@ -883,8 +883,8 @@ export function SenderView({ initialCode, onExit }: Props) {
 
 				{state.phase === "ready" && (
 					<div className="flex w-full max-w-[560px] flex-col gap-6">
-						{!canMirror() && (
-							<Alert variant="warning" title={t("sender.iosTitle")}>
+						{!canMirror() && castStatus.url === null && (
+							<Alert variant="info" title={t("sender.iosTitle")}>
 								{t("sender.iosBody")}
 							</Alert>
 						)}

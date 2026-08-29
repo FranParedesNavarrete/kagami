@@ -74,6 +74,18 @@ packages/shared/src/
 - No mover tags publicados; no reescribir historia.
 - No añadir cuentas, base de datos ni Redis: si parece que hacen falta,
   es una conversacion de SPECS, no una decision de implementacion.
+- No reconstruir un control nativo (`<select>`, etc.) como componente
+  a medida solo para poder tematizarlo entero. Deuda aceptada a
+  proposito, no descuido: el `<select>` de dispositivo de audio
+  (`SenderView.tsx`) tiene fondo/borde/texto tematizados, pero su
+  flecha y su desplegable los pinta el sistema operativo — ninguna
+  propiedad CSS estandar llega ahi (`accent-color` no se aplica a
+  `<select>`, solo a checkbox/radio/range/progress). Reconstruirlo con
+  un `<div>`/`<ul>` a medida es la forma clasica de romper el teclado y
+  los lectores de pantalla; que la flecha la pinte el sistema es un
+  precio barato, y decirlo aqui es mejor que taparlo (ver
+  `docs/screen-aspect.md`, "Controles nativos sin tematizar", para el
+  resto de esta misma clase de fallo).
 
 ## 6 · Git
 

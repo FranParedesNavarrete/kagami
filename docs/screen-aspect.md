@@ -246,17 +246,11 @@ el anillo desaparecía para quien navega por teclado en ese input
 concreto — el único de toda la app. Quitado; el input se queda solo
 con el cambio de borde en foco, y el anillo global vuelve a aplicar.
 
-**Lo que queda sin arreglo posible, documentado en vez de escondido**:
-el único `<select>` de la app (selector de dispositivo de audio,
-`SenderView.tsx`) tiene el fondo/borde/texto tematizados, pero su
-flecha y la lista desplegable son pintadas enteras por el sistema
-operativo — ninguna propiedad CSS estándar llega ahí (`accent-color`
-no se aplica a `<select>`, solo a checkbox/radio/range/progress), y
-lo único que lo resolvería de verdad es reconstruir el control entero
-con un `<div>`/`<ul>` a medida en vez de un `<select>` nativo. Deuda
-aceptada a propósito: el coste de esa reconstrucción no está
-justificado por un elemento que aparece una vez, en un desplegable
-secundario.
+Lo que queda sin arreglo posible (el único `<select>` de la app, con
+flecha y desplegable pintados por el sistema) está anotado como deuda
+aceptada en `CODESTYLE.md` §5, junto a las demás prohibiciones/reglas
+de la app — no aquí, porque no es un fallo de modos de aspecto y quien
+busque una deuda de estilo mirará ahí antes que en este documento.
 
 **Cómo se detecta esta clase de fallo a partir de ahora**: como no hay
 ningún color literal que buscar con un grep, hace falta comprobar el

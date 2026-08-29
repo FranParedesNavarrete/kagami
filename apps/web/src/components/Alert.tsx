@@ -1,4 +1,4 @@
-import { CircleAlert, TriangleAlert } from "lucide-react";
+import { CircleAlert, Info, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 // Componente de alerta unico para toda la app (encargo de rediseño,
@@ -6,8 +6,12 @@ import type { ReactNode } from "react";
 // opacidad, icono, titular en --silver, explicacion debajo, y siempre
 // una accion de salida cuando la hay. "error" es --coral (fallos de
 // reproduccion, subida, union a sala); "warning" es --amber (el aviso
-// de DRM usa esta variante).
-export type AlertVariant = "error" | "warning";
+// de DRM usa esta variante: ahi si hay una expectativa que se rompe).
+// "info" es --muted (encargo "el azul del control de volumen", parte
+// 2): para algo esperado y normal que no es un fallo ni va a serlo —
+// el amber puesto ahi seria enseñar a ignorar alertas, y la de DRM
+// perderia fuerza.
+export type AlertVariant = "error" | "warning" | "info";
 
 const VARIANT_STYLES: Record<
 	AlertVariant,
@@ -23,6 +27,11 @@ const VARIANT_STYLES: Record<
 		bg: "bg-amber/[0.07]",
 		icon: "text-amber",
 	},
+	info: {
+		border: "border-muted/30",
+		bg: "bg-muted/[0.07]",
+		icon: "text-muted",
+	},
 };
 
 interface Props {
@@ -34,7 +43,12 @@ interface Props {
 
 export function Alert({ variant, title, children, actions }: Props) {
 	const styles = VARIANT_STYLES[variant];
-	const Icon = variant === "warning" ? TriangleAlert : CircleAlert;
+	const Icon =
+		variant === "warning"
+			? TriangleAlert
+			: variant === "info"
+				? Info
+				: CircleAlert;
 	return (
 		<div
 			role="alert"
