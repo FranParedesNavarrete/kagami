@@ -60,6 +60,7 @@
 	"sender.braveWarning": "O Brave pode bloquear a codificação de tela por completo aqui — tente desativar os Shields para este site",
 	"sender.safariNote": "O Safari captura a tela em metade da resolução e não grava áudio do sistema — o Chrome com VP8 dá o melhor resultado",
 	"sender.chromeH264Warning": "O codificador H.264 do Chrome está quebrado em Apple Silicon (medido ~3fps) — VP8 é recomendado",
+	"sender.h264AspectWarning": "Codec H.264 — em TVs com decodificação por hardware, os modos de aspecto não têm efeito visível (o plano de vídeo da própria TV ignora o CSS da página); só \"expanded\" corresponde à realidade. Medido em uma LG OLED — mude para VP8 para os outros modos funcionarem.",
 	"sender.highDelayWarning": "o codificador não está dando conta",
 	"sender.bitrateExceedsWarning": "Enviando mais do que a rede consegue lidar agora",
 	"sender.joinError.room-not-found": "Esse código não existe ou já expirou",

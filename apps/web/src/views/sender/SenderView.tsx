@@ -607,6 +607,13 @@ export function SenderView({ initialCode, onExit }: Props) {
 		stats.kbps > stats.availableKbps;
 	const highPacketDelay =
 		stats.avgPacketDelayMs !== null && stats.avgPacketDelayMs > 20;
+	// Medido en una LG OLED (docs/webrtc-codec.md): H.264 se decodifica por
+	// hardware y se pinta en un plano de video superpuesto que el escalador
+	// de la propia tele controla — el CSS de la pagina (containerStyleForAspect
+	// / object-fit) no llega a ese plano. Solo "expanded" coincide con lo que
+	// el overlay hace por su cuenta; los otros cuatro modos no tienen efecto
+	// visible. VP8 se decodifica en el plano normal y si respeta el CSS.
+	const negotiatedH264 = stats.codec !== null && /h264/i.test(stats.codec);
 
 	return (
 		<div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-6 text-center text-white">
@@ -1046,6 +1053,11 @@ export function SenderView({ initialCode, onExit }: Props) {
 					{bitrateExceedsAvailable && (
 						<p className="text-sm text-red-400">
 							{t("sender.bitrateExceedsWarning")}
+						</p>
+					)}
+					{negotiatedH264 && (
+						<p className="max-w-md text-sm text-yellow-400">
+							{t("sender.h264AspectWarning")}
 						</p>
 					)}
 

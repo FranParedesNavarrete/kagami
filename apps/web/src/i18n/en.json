@@ -60,6 +60,7 @@
 	"sender.braveWarning": "Brave may block screen encoding entirely here — try disabling Shields for this site",
 	"sender.safariNote": "Safari captures the screen at half resolution and can't record system audio — Chrome with VP8 gives the best result",
 	"sender.chromeH264Warning": "Chrome's H.264 encoder is broken on Apple Silicon (measured ~3fps) — VP8 is recommended",
+	"sender.h264AspectWarning": "Codec is H.264 — on TVs with hardware decoding, aspect modes have no visible effect (the TV's own video overlay ignores the page's CSS); only \"expanded\" matches reality. Measured on an LG OLED — switch to VP8 for the other modes to work.",
 	"sender.highDelayWarning": "the encoder can't keep up",
 	"sender.bitrateExceedsWarning": "Sending more than the network can currently handle",
 	"sender.joinError.room-not-found": "That code doesn't exist or already expired",
