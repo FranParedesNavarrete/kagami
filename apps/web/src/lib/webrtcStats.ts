@@ -97,6 +97,26 @@ export async function getOutboundVideoStats(
 	return result;
 }
 
+// Bitrate real de audio, igual que el de video — medido que el audio de
+// sistema viajaba mono a 32 kbps (docs/webrtc-quality.md) sin que nadie
+// lo pidiera a proposito, asi que ahora se ve en la UI del emisor igual
+// que el de video en vez de quedar invisible.
+export interface OutboundAudioStats {
+	bytesSent: number;
+}
+
+export async function getOutboundAudioStats(
+	pc: RTCPeerConnection,
+): Promise<OutboundAudioStats | null> {
+	const report = await pc.getStats();
+	for (const stat of report.values()) {
+		if (stat.type === "outbound-rtp" && stat.kind === "audio") {
+			return { bytesSent: stat.bytesSent ?? 0 };
+		}
+	}
+	return null;
+}
+
 // El otro lado del ajuste adaptativo (lib/quality.ts capMaxBitrate): lo
 // que WebRTC estima que la red puede llevar de verdad ahora mismo, del
 // par de candidatos ICE nominado (el que esta realmente en uso).

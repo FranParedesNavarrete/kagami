@@ -13,6 +13,11 @@ import {
 	saveAspectMode,
 } from "../../lib/aspect.js";
 import {
+	AUDIO_MAX_BITRATE_BPS,
+	applyAudioBitrate,
+	withStereoOpus,
+} from "../../lib/audioQuality.js";
+import {
 	type AudioSource,
 	captureMedia,
 	deriveAudioDeviceSelection,
@@ -58,6 +63,7 @@ import {
 import {
 	getAvailableOutgoingBitrate,
 	getNegotiatedVideoCodec,
+	getOutboundAudioStats,
 	getOutboundVideoStats,
 } from "../../lib/webrtcStats.js";
 
@@ -102,6 +108,7 @@ interface LiveStats {
 	fps: number | null;
 	sourceFps: number | null;
 	kbps: number | null;
+	audioKbps: number | null;
 	availableKbps: number | null;
 	avgQp: number | null;
 	limitationReason: string | null;
@@ -114,6 +121,7 @@ const EMPTY_STATS: LiveStats = {
 	fps: null,
 	sourceFps: null,
 	kbps: null,
+	audioKbps: null,
 	availableKbps: null,
 	avgQp: null,
 	limitationReason: null,
@@ -343,13 +351,28 @@ export function SenderView({ initialCode, onExit }: Props) {
 						scaleDownBy,
 					).catch((err) => console.warn("setParameters failed", err));
 				} else {
-					pc.addTrack(track, stream);
+					const audioSender = pc.addTrack(track, stream);
+					// 128 kbps estereo, no los ~32 kbps mono de una videollamada:
+					// es audio de sistema (musica, peliculas), no una voz (docs/
+					// webrtc-quality.md). El estereo en si se pide en el SDP, ver
+					// mas abajo — esto solo levanta el techo de bitrate.
+					await applyAudioBitrate(audioSender, AUDIO_MAX_BITRATE_BPS).catch(
+						(err) => console.warn("setParameters (audio) failed", err),
+					);
 				}
 			}
 
 			const offer = await pc.createOffer();
-			await pc.setLocalDescription(offer);
-			send({ type: "offer", sdp: offer as { type: "offer"; sdp: string } });
+			// Chrome/Safari negocian Opus mono por defecto para cualquier
+			// pista de audio, sin distinguir "voz" de "audio de sistema" — el
+			// SDP hay que tocarlo a mano, en una unica funcion documentada
+			// (lib/audioQuality.ts), nunca con reemplazos de texto dispersos.
+			const stereoSdp = withStereoOpus(offer.sdp ?? "");
+			await pc.setLocalDescription({ type: offer.type, sdp: stereoSdp });
+			send({
+				type: "offer",
+				sdp: { type: "offer", sdp: stereoSdp },
+			});
 		},
 		[send, quality, codecPref, resolutionPreset],
 	);
@@ -424,6 +447,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 	useEffect(() => {
 		if (state.phase !== "sharing") return;
 		let lastBytes = 0;
+		let lastAudioBytes = 0;
 		let lastQpSum = 0;
 		let lastFramesEncoded = 0;
 		let lastDelay = 0;
@@ -433,9 +457,10 @@ export function SenderView({ initialCode, onExit }: Props) {
 		const interval = setInterval(async () => {
 			const pc = sessionRef.current?.pc;
 			if (!pc) return;
-			const [codec, outbound, availableBps] = await Promise.all([
+			const [codec, outbound, outboundAudio, availableBps] = await Promise.all([
 				getNegotiatedVideoCodec(pc, "outbound-rtp"),
 				getOutboundVideoStats(pc),
+				getOutboundAudioStats(pc),
 				getAvailableOutgoingBitrate(pc),
 			]);
 			if (!outbound) return;
@@ -446,6 +471,15 @@ export function SenderView({ initialCode, onExit }: Props) {
 				elapsedS > 0
 					? Math.round(((outbound.bytesSent - lastBytes) * 8) / elapsedS / 1000)
 					: null;
+			const audioKbps =
+				outboundAudio && elapsedS > 0
+					? Math.round(
+							((outboundAudio.bytesSent - lastAudioBytes) * 8) /
+								elapsedS /
+								1000,
+						)
+					: null;
+			if (outboundAudio) lastAudioBytes = outboundAudio.bytesSent;
 
 			let avgQp: number | null = null;
 			if (
@@ -499,6 +533,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 				fps: outbound.framesPerSecond ?? prev.fps,
 				sourceFps: prev.sourceFps,
 				kbps: kbps ?? prev.kbps,
+				audioKbps: audioKbps ?? prev.audioKbps,
 				availableKbps:
 					availableBps !== null
 						? Math.round(availableBps / 1000)
@@ -1037,6 +1072,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 						{stats.availableKbps !== null
 							? ` (avail ${(stats.availableKbps / 1000).toFixed(1)})`
 							: ""}
+						{stats.audioKbps !== null ? ` · audio ${stats.audioKbps}kbps` : ""}
 						{stats.avgQp !== null ? ` · QP ${stats.avgQp}` : ""}
 						{stats.limitationReason
 							? ` · limit: ${stats.limitationReason}`
