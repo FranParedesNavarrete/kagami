@@ -1,6 +1,70 @@
+@import "./fonts.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Rediseño visual: sin subrayados globales (encargo, parte 3) — los
+   enlaces se distinguen por color (--glass, texto --silver en hover),
+   nunca por decoracion de texto. */
+a {
+	text-decoration: none;
+}
+
+body {
+	background-color: #0a0e0d;
+	color: #e9efec;
+	font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Pointer en todo lo pulsable (encargo, parte 4): las pistas de las
+   barras de progreso/volumen dan pointer, el tirador (thumb) da grab/
+   grabbing y crece ligeramente en hover — Chrome/Safari exigen
+   prefijo -webkit- para estilar el thumb de un <input type="range">. */
+input[type="range"] {
+	cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+	cursor: grab;
+	transition: transform 0.15s ease;
+}
+input[type="range"]:active::-webkit-slider-thumb {
+	cursor: grabbing;
+}
+input[type="range"]:hover::-webkit-slider-thumb {
+	transform: scale(1.15);
+}
+input[type="range"]::-moz-range-thumb {
+	cursor: grab;
+	transition: transform 0.15s ease;
+}
+input[type="range"]:active::-moz-range-thumb {
+	cursor: grabbing;
+}
+input[type="range"]:hover::-moz-range-thumb {
+	transform: scale(1.15);
+}
+
+summary {
+	cursor: pointer;
+}
+
+/* Foco visible en todo lo enfocable (accesibilidad del encargo): anillo
+   de 2px en --glass con 3px de separacion, nunca el outline por
+   defecto del navegador ni "nada". */
+:focus-visible {
+	outline: 2px solid #6fd9b9;
+	outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}
 
 /* Vista pantalla: cero scroll, siempre, en cualquier modo de aspecto,
    tambien en la pantalla de codigo y al volver a ella tras cortar la

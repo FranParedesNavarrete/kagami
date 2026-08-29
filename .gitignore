@@ -6,6 +6,14 @@
 *.md
 !README.md
 
+# ---------------------------------------------------------------- referencia de diseño
+# Misma politica que los .md de arriba: docs/ui-propuesta.html es
+# documentacion de trabajo (la maqueta del rediseño visual), no la cara
+# publica del proyecto. Los SVG/PNG de referencia del lockup igual.
+docs/*.html
+docs/logo-lockup-*.svg
+docs/logo-lockup.png
+
 # ---------------------------------------------------------------- node
 node_modules/
 dist/

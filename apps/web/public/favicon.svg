@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="kagami">
+  <rect width="48" height="48" rx="11" fill="#0A0E0D"/>
+  <rect x="11" y="10" width="26" height="13.5" rx="4.2" fill="#E9EFEC"/>
+  <rect x="8.5" y="24.6" width="31" height="1.3" rx=".65" fill="#E9EFEC" opacity=".42"/>
+  <rect x="11" y="27" width="26" height="13.5" rx="4.2" fill="#6FD9B9" opacity=".5"/>
+</svg>

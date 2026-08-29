@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="kagami">
+  <!-- El cuerpo usa currentColor: hereda el color del texto y funciona en claro y en oscuro. -->
+  <defs><linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6FD9B9" stop-opacity=".62"/><stop offset="1" stop-color="#6FD9B9" stop-opacity="0"/></linearGradient></defs>
+  <rect x="9" y="7" width="30" height="16" rx="5" fill="currentColor"/>
+  <rect x="6" y="24.4" width="36" height="1.4" rx=".7" fill="currentColor" opacity=".38"/>
+  <rect x="9" y="27.2" width="30" height="16" rx="5" fill="url(#r)"/>
+</svg>
