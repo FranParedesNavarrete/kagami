@@ -18,6 +18,7 @@ interface Props {
 	onVolumeChange: (volume: number) => void;
 	playPauseTestId?: string;
 	volumeTestId?: string;
+	volumeLabel: string;
 	skipLabels: { back: string; forward: string; playPause: string };
 }
 
@@ -30,6 +31,7 @@ export function PlaybackControls({
 	onVolumeChange,
 	playPauseTestId,
 	volumeTestId,
+	volumeLabel,
 	skipLabels,
 }: Props) {
 	return (
@@ -79,6 +81,7 @@ export function PlaybackControls({
 				<input
 					type="range"
 					data-testid={volumeTestId}
+					aria-label={volumeLabel}
 					min={0}
 					max={1}
 					step={0.01}

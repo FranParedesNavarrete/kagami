@@ -1074,6 +1074,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 												<input
 													type="range"
 													data-testid="cast-seek"
+													aria-label={t("sender.castSeekLabel")}
 													min={0}
 													max={castStatus.durationSec ?? 0}
 													step={0.1}
@@ -1125,6 +1126,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 													}
 													playPauseTestId="cast-play-pause"
 													volumeTestId="cast-volume"
+													volumeLabel={t("sender.castVolumeLabel")}
 													skipLabels={{
 														back: t("sender.playbackSkipBack"),
 														forward: t("sender.playbackSkipForward"),

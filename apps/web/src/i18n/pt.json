@@ -60,6 +60,8 @@
 	"sender.castPause": "Pausar",
 	"sender.playbackSkipBack": "Voltar 10 segundos",
 	"sender.playbackSkipForward": "Avançar 10 segundos",
+	"sender.castVolumeLabel": "Volume",
+	"sender.castSeekLabel": "Posição de reprodução",
 	"sender.castPositionLabel": "{current} / {duration}",
 	"sender.advancedTitle": "Qualidade e áudio",
 	"sender.codecPreference": "Codec",
