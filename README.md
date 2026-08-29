@@ -15,11 +15,13 @@ Self-hosted. No cables, no store apps, no accounts.
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
-     IMAGEN 1 · HERO  ·  docs/media/hero.png  ·  1600×900
+     IMAGEN 1 · HERO  ·  docs/media/hero.jpg  ·  1600px de ancho
      La tele mostrando el codigo de sala grande y el QR.
-     Preferible FOTO del salon a captura de pantalla: vende mucho mas.
+     Foto del salon, no captura de pantalla — JPEG, no PNG: una foto
+     real pesa entre 15 y 30 veces menos como JPEG que como PNG sin
+     perdida, y a esta resolucion la diferencia no se nota a ojo.
      ══════════════════════════════════════════════════════════════════ -->
-<img src="docs/media/hero.png" alt="A TV showing a kagami room code" width="100%">
+<img src="docs/media/hero.jpg" alt="A TV showing a kagami room code" width="100%">
 
 <br>
 
