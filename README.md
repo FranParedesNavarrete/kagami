@@ -130,7 +130,7 @@ diagnoses that turned out to be wrong — is in [`docs/`](docs/).
 ## Quick start
 
 ```bash
-git clone <repo> kagami && cd kagami
+git clone https://github.com/FranParedesNavarrete/kagami.git && cd kagami
 docker compose up -d
 ```
 
@@ -258,10 +258,11 @@ limitation, not a kagami one. The workaround is a virtual audio device.
 Your Mac plays through the speakers as usual, and kagami captures the same
 signal on its way past.
 
-Two things worth knowing: while the Multi-Output Device is active you lose
-volume control from the keyboard, and the device itself never appears in
-kagami's picker — that list shows *inputs*, and BlackHole is the input half of
-the pair.
+Two things worth knowing. The Mac's own volume no longer changes what the TV
+hears — BlackHole taps the signal before the system volume stage, so the keys
+do nothing to the stream. Use kagami's volume slider, or the television's own
+volume. And the Multi-Output Device never appears in kagami's picker: that
+list shows inputs, and BlackHole is the input half of the pair.
 
 </details>
 
