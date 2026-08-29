@@ -240,7 +240,14 @@ export function ScreenView() {
 						break;
 
 					case "peer-joined":
-						setState({ phase: "peer-connecting" });
+						// Puede ser el emparejamiento inicial (pasar a esperar una
+						// oferta o un cast), o un emisor reconectando a una sala que
+						// quedo "pantalla sola" durante un cast (SPECS.md §6) — en ese
+						// caso NO hay que tocar el estado: el video ya esta
+						// reproduciendose y no depende de que el emisor este ahi.
+						if (phaseRef.current !== "casting") {
+							setState({ phase: "peer-connecting" });
+						}
 						break;
 
 					case "offer": {

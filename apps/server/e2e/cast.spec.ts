@@ -148,6 +148,82 @@ test("sender disconnecting (locking the phone) does not stop playback on the TV"
 	await screenCtx.close();
 });
 
+test("the same room code reconnects after the sender leaves a cast and recovers the real state (SPECS.md §6)", async ({
+	browser,
+}) => {
+	const screenCtx = await browser.newContext();
+	const senderCtx = await browser.newContext();
+	const screen = await screenCtx.newPage();
+	const sender = await senderCtx.newPage();
+
+	await screen.route(CAST_URL, fulfillWithRangeSupport);
+
+	await screen.goto("/");
+	await screen.getByText("Be the screen").click();
+	const code = (await screen.getByTestId("room-code").innerText()).trim();
+
+	await sender.goto(`/?code=${code}`);
+	await sender.getByText("Cast a URL").click();
+	await sender.getByTestId("cast-url-input").fill(CAST_URL);
+	await sender.getByTestId("cast-url-submit").click();
+
+	await expect
+		.poll(
+			async () =>
+				screen.evaluate(
+					() =>
+						document.querySelector(`[data-testid="cast-video"]`)?.readyState ??
+						0,
+				),
+			{ timeout: 10_000 },
+		)
+		.toBeGreaterThanOrEqual(1);
+
+	// El primer emisor bloquea el telefono (cierra su conexion del todo).
+	await senderCtx.close();
+	await screen.waitForTimeout(1500);
+
+	// Un SEGUNDO emisor entra con el MISMO codigo -- no un codigo nuevo,
+	// la sala no ha muerto (SPECS.md §6, asimetria del cast).
+	const reconnectCtx = await browser.newContext();
+	const reconnected = await reconnectCtx.newPage();
+	await reconnected.goto(`/?code=${code}`);
+
+	// Recupera el control mostrando la etiqueta de lo que ya se esta
+	// reproduciendo, no el formulario de pegar una URL nueva.
+	await expect(reconnected.getByText(`Casting: ${CAST_URL}`)).toBeVisible({
+		timeout: 10_000,
+	});
+
+	// Y el estado real (posicion avanzada, reproduciendo) — nunca los
+	// valores por defecto (0:00, pausado) como si nada hubiera pasado.
+	await expect(reconnected.getByTestId("cast-play-pause")).toContainText(
+		"Pause",
+		{ timeout: 10_000 },
+	);
+	await expect
+		.poll(async () =>
+			reconnected.evaluate(() => {
+				const el = document.querySelector(
+					'[data-testid="cast-seek"]',
+				) as HTMLInputElement | null;
+				return el ? Number(el.value) : 0;
+			}),
+		)
+		.toBeGreaterThan(0);
+
+	// El video en la tele nunca se detuvo durante todo esto.
+	const stillPlaying = await screen.evaluate(
+		() =>
+			(document.querySelector('[data-testid="cast-video"]') as HTMLVideoElement)
+				.paused,
+	);
+	expect(stillPlaying).toBe(false);
+
+	await screenCtx.close();
+	await reconnectCtx.close();
+});
+
 test("rejects a non-http(s) cast URL with a clear message, client-side", async ({
 	browser,
 }) => {
