@@ -876,7 +876,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 				</div>
 			</header>
 
-			<main className="flex flex-1 flex-col gap-6 px-5 py-6">
+			<main className="flex flex-1 flex-col items-center gap-6 px-5 py-6">
 				{state.phase === "joining" && (
 					<p className="text-lg text-muted">{t("sender.joining")}</p>
 				)}

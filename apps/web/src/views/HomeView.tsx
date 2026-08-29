@@ -21,7 +21,7 @@ export function HomeView({ onBeScreen, onJoin }: Props) {
 				<LanguageSwitcher />
 			</header>
 
-			<main className="flex flex-1 flex-col justify-center gap-8 px-5 py-8">
+			<main className="flex flex-1 flex-col items-center justify-center gap-8 px-5 py-8">
 				<div className="max-w-[560px]">
 					<h1 className="font-display text-[26px] font-semibold tracking-tight">
 						{t("home.title")}
