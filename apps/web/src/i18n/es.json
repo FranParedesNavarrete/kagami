@@ -81,6 +81,7 @@
 	"sender.iosTitle": "Sin espejo de sistema en iPhone/iPad",
 	"sender.iosBody": "iOS no permite que ningún navegador capture la pantalla del sistema — eso es exclusivo de AirPlay. Pega abajo el enlace de un vídeo para mandarlo a la tele en su lugar.",
 	"sender.shareScreen": "Compartir pantalla",
+	"sender.drmNotice": "Netflix, Prime, Disney+ y similares se ven en negro al espejarlos — es el DRM funcionando como debe, no un fallo. Usa la app propia de la tele para esos casos.",
 	"sender.sharingLabel": "Compartiendo: {label}",
 	"sender.audioYes": "audio: sí",
 	"sender.audioNo": "audio: no",

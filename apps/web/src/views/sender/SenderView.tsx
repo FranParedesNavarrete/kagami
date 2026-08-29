@@ -1248,6 +1248,14 @@ export function SenderView({ initialCode, onExit }: Props) {
 								<MonitorUp size={28} />
 								{t("sender.shareScreen")}
 							</button>
+							{/* Aviso preventivo, no una deteccion (encargo de cierre,
+							parte 3): no hay forma fiable de saber desde el emisor si la
+							pestaña que se va a compartir tiene DRM antes de intentarlo —
+							solo se sabe cuando ya sale en negro. Por eso es permanente
+							junto al boton, no condicional a nada. */}
+							<p className="max-w-md text-center text-xs text-white/40">
+								{t("sender.drmNotice")}
+							</p>
 							{state.error && (
 								<p className="max-w-md text-red-400">{state.error}</p>
 							)}

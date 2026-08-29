@@ -81,6 +81,7 @@
 	"sender.iosTitle": "No system mirror on iPhone/iPad",
 	"sender.iosBody": "iOS doesn't let any browser capture the system screen — that's AirPlay's exclusive. Paste a video link below to cast it to the TV instead.",
 	"sender.shareScreen": "Share screen",
+	"sender.drmNotice": "Netflix, Prime, Disney+ and similar show a black screen when mirrored — that's DRM working as intended, not a bug. Use the TV's own app for those instead.",
 	"sender.sharingLabel": "Sharing: {label}",
 	"sender.audioYes": "audio: yes",
 	"sender.audioNo": "audio: no",
