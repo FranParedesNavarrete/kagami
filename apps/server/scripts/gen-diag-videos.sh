@@ -35,11 +35,18 @@ gen plain.mp4
 
 echo
 echo "Comprobacion rapida de donde quedo el atomo moov (primeros 200KB):"
+# node -e, no `grep -abo`: BusyBox (Alpine, donde corre esto dentro del
+# build de Docker) no soporta -a ni -b, solo GNU grep los tiene — node
+# ya es parte de la imagen de build, no anade nada nuevo.
 for f in faststart plain; do
-	pos=$(head -c 200000 "data/diag-range/$f.mp4" | grep -abo moov | head -1 | cut -d: -f1 || true)
-	if [ -n "${pos:-}" ]; then
-		echo "  $f.mp4: moov encontrado a ~${pos} bytes (dentro de los primeros 200KB)"
-	else
-		echo "  $f.mp4: moov NO esta en los primeros 200KB (al final del fichero, como se espera de 'plain')"
-	fi
+	node -e '
+		const fs = require("node:fs");
+		const buf = fs.readFileSync(process.argv[1]).subarray(0, 200000);
+		const pos = buf.indexOf("moov");
+		if (pos === -1) {
+			console.log("  " + process.argv[2] + ".mp4: moov NO esta en los primeros 200KB (al final del fichero, como se espera de \"plain\")");
+		} else {
+			console.log("  " + process.argv[2] + ".mp4: moov encontrado a ~" + pos + " bytes (dentro de los primeros 200KB)");
+		}
+	' "data/diag-range/$f.mp4" "$f"
 done
