@@ -4,6 +4,16 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>kagami</title>
+		<!-- "Añadir a pantalla de inicio" sin la barra del navegador (encargo
+		     M1, parte F) — sin verificar en un dispositivo real todavia, ver
+		     README.md. El manifest basta en Android/Chrome; iOS Safari
+		     historicamente ignora "display: standalone" del manifest salvo
+		     que ademas esten estas dos etiquetas propias de Apple. -->
+		<link rel="manifest" href="/manifest.json" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+		<meta name="theme-color" content="#0a0a0a" />
 	</head>
 	<body>
 		<div id="root"></div>

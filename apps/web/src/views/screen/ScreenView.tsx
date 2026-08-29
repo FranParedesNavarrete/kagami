@@ -1,3 +1,4 @@
+import { Maximize } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DebugOverlay } from "../../components/DebugOverlay.js";
 import { QrCode } from "../../components/QrCode.js";
@@ -8,6 +9,7 @@ import {
 	containerStyleForAspect,
 	videoObjectFitForAspect,
 } from "../../lib/aspect.js";
+import { enterFullscreen } from "../../lib/fullscreen.js";
 import { type MediaErrorKind, mediaErrorKind } from "../../lib/mediaError.js";
 import {
 	type PeerSession,
@@ -136,6 +138,19 @@ export function ScreenView() {
 			wakeLockRef.current?.release().catch(() => {});
 			wakeLockRef.current = null;
 		};
+	}, [state.phase]);
+
+	// Boton de pantalla completa (encargo M1, parte F) — el elemento de
+	// video correcto depende de la fase (espejo o cast), pero el nodo raiz
+	// a pedir en pantalla completa es siempre el mismo (ver fullscreen.ts).
+	const handleFullscreenClick = useCallback(() => {
+		const video =
+			state.phase === "casting"
+				? castVideoRef.current
+				: state.phase === "sharing"
+					? videoRef.current
+					: null;
+		enterFullscreen(document.documentElement, video);
 	}, [state.phase]);
 
 	const stopStatsWatcher = useCallback(() => {
@@ -403,7 +418,7 @@ export function ScreenView() {
 	useEffect(() => stopStatsWatcher, [stopStatsWatcher]);
 
 	return (
-		<div className="flex h-[100dvh] w-[100dvw] items-center justify-center overflow-hidden bg-black text-white">
+		<div className="relative flex h-[100dvh] w-[100dvw] items-center justify-center overflow-hidden bg-black text-white">
 			{/* La caja decide el tamaño por modo (containerStyleForAspect); el
 			    video en si es siempre 100%/100%/block dentro de ella y solo
 			    cambia su object-fit (videoObjectFitForAspect). Lo que se ve
@@ -538,6 +553,18 @@ export function ScreenView() {
 						</p>
 					)}
 				</div>
+			)}
+
+			{(state.phase === "sharing" || state.phase === "casting") && (
+				<button
+					type="button"
+					onClick={handleFullscreenClick}
+					aria-label={t("screen.fullscreen")}
+					title={t("screen.fullscreen")}
+					className="absolute top-4 right-4 rounded-full bg-black/40 p-3 text-white/70 hover:bg-black/60 hover:text-white"
+				>
+					<Maximize size={28} />
+				</button>
 			)}
 
 			{DEBUG && Object.keys(debugInfo).length > 0 && (

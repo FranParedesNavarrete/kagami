@@ -28,6 +28,19 @@ introduces the two devices.
   apps for those.
 - **No internet relay.** kagami is LAN-first. For remote use, put it
   behind your VPN (it works over Tailscale out of the box).
+- **Fullscreen on the TV view is not verified on real hardware yet.** It
+  tries three fallbacks in order: `requestFullscreen()` (the standard
+  path — expected to work on desktop and Android Chrome, not yet tested
+  on webOS), `video.webkitEnterFullscreen()` on the `<video>` element
+  itself (iOS Safari's only fullscreen entry point — not yet tested on a
+  real iPhone/iPad), and a `display: standalone` manifest so "Add to Home
+  Screen" opens without browser chrome (static config, not yet verified
+  on a real device either). None of this is claimed to work until it has
+  been checked on the actual TV and an actual phone.
+- **Pasting a YouTube/Vimeo/Twitch link casts nothing.** Those are pages,
+  not video files — kagami detects the known domains and says so instead
+  of failing with a confusing "unsupported format" error. It does not,
+  and will not, play those platforms itself; use the TV's own app.
 
 ## Requirements
 

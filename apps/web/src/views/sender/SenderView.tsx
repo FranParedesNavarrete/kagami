@@ -39,6 +39,10 @@ import {
 	saveCodecPreference,
 } from "../../lib/codec.js";
 import {
+	VIDEO_PAGE_SITE_NAMES,
+	detectVideoPageSite,
+} from "../../lib/pageUrl.js";
+import {
 	QUALITY_PRESETS,
 	type QualityPreset,
 	applyQualityToSender,
@@ -317,6 +321,22 @@ export function SenderView({ initialCode, onExit }: Props) {
 		const parsed = CastUrlSchema.safeParse(castUrlInput.trim());
 		if (!parsed.success) {
 			setCastUrlError(t("sender.castUrlInvalid"));
+			return;
+		}
+		// Un enlace de YouTube/Vimeo/Twitch pasa esta validacion (es un
+		// http/https valido) pero sirve una pagina, no un fichero de video —
+		// sin esto, el fallo llega luego en la tele como "formato no
+		// soportado", tecnicamente cierto pero incomprensible para quien lo
+		// pego (encargo M1, parte F).
+		const pageSite = detectVideoPageSite(parsed.data);
+		if (pageSite) {
+			setCastUrlError(
+				pageSite === "youtube"
+					? t("sender.castUrlIsPageYoutube")
+					: t("sender.castUrlIsPage", {
+							site: VIDEO_PAGE_SITE_NAMES[pageSite],
+						}),
+			);
 			return;
 		}
 		setCastUrlError(null);
