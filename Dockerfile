@@ -31,6 +31,15 @@ RUN corepack enable
 WORKDIR /app
 ENV NODE_ENV=production
 
+# A diferencia de los fixtures de /diag/range (arriba, solo hacen falta
+# en build): el cast de fichero (M1 parte 3) remuxea a faststart lo que
+# suba un usuario EN TIEMPO DE EJECUCION (apps/server/src/lib/remux.ts),
+# asi que ffmpeg tiene que vivir en la imagen final, no solo en la de
+# build. Si no estuviera disponible, kagami sigue sirviendo el fichero
+# tal cual y avisa en la UI de que el salto puede no funcionar — nunca
+# falla en silencio — pero instalarlo aqui es lo normal, no la excepcion.
+RUN apk add --no-cache ffmpeg
+
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY apps/server/package.json apps/server/package.json
