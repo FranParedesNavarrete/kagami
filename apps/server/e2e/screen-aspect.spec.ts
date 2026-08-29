@@ -182,3 +182,55 @@ test("casting: the video fills the screen honestly, and the hidden mirror video 
 	await screenCtx.close();
 	await senderCtx.close();
 });
+
+// Regresion real reportada por Fran con una captura de un iPhone real:
+// el QR salia recortado en movil. Causa (medida, no adivinada): la
+// libreria `qrcode` fija su propio `style.width`/`style.height` inline
+// tras dibujar (para que no salga borroso), y un estilo inline gana
+// SIEMPRE a las clases de Tailwind (w-full/h-auto) sin importar el
+// orden ni la especificidad — el canvas se quedaba a 300px fijos
+// dentro de una tarjeta de 96px en movil, desbordando por la derecha.
+// Arreglado en QrCode.tsx pisando el estilo de la libreria justo
+// despues de que termine. Este test cubre el ancho de movil real que
+// disparo el bug (390px, el mismo orden de magnitud que un iPhone) y
+// uno de escritorio, para que ambos queden cuadrados.
+test("the room-code QR stays square (not clipped) at a real mobile viewport width", async ({
+	browser,
+}) => {
+	const mobileCtx = await browser.newContext({
+		viewport: { width: 390, height: 844 },
+	});
+	const desktopCtx = await browser.newContext({
+		viewport: { width: 1280, height: 800 },
+	});
+	const mobile = await mobileCtx.newPage();
+	const desktop = await desktopCtx.newPage();
+
+	for (const page of [mobile, desktop]) {
+		await page.goto("/");
+		await page.getByText("Show code").click();
+		await page.waitForSelector('[data-testid="room-code-qr"]');
+
+		const rects = await page.evaluate(() => {
+			const container = document.querySelector(
+				'[data-testid="room-code-qr"]',
+			) as HTMLElement;
+			const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+			const c = container.getBoundingClientRect();
+			const v = canvas.getBoundingClientRect();
+			return {
+				container: { w: c.width, h: c.height },
+				canvas: { w: v.width, h: v.height },
+			};
+		});
+
+		expect(Math.abs(rects.container.w - rects.container.h)).toBeLessThan(1);
+		expect(Math.abs(rects.canvas.w - rects.canvas.h)).toBeLessThan(1);
+		// El canvas nunca debe desbordar la tarjeta que lo recorta.
+		expect(rects.canvas.w).toBeLessThanOrEqual(rects.container.w + 0.5);
+		expect(rects.canvas.h).toBeLessThanOrEqual(rects.container.h + 0.5);
+	}
+
+	await mobileCtx.close();
+	await desktopCtx.close();
+});

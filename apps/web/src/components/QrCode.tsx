@@ -21,11 +21,25 @@ export function QrCode({
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
 	useEffect(() => {
-		if (!canvasRef.current) return;
-		QRCode.toCanvas(canvasRef.current, value, {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+		QRCode.toCanvas(canvas, value, {
 			width: resolution,
 			margin: 2,
-		}).catch((err) => console.warn("qr render failed", err));
+		})
+			.then(() => {
+				// `toCanvas` fija sus propios `style.width`/`style.height`
+				// inline (para que no salga borroso) — un estilo inline gana
+				// SIEMPRE a cualquier clase, sin importar el orden ni la
+				// especificidad, y eso pisaba el `w-full h-auto` de aqui
+				// abajo: en movil, el canvas se quedaba a 300px fijos dentro
+				// de una tarjeta de 96px, desbordando y cortandose (visto en
+				// una captura real de Fran en iPhone, no en Chromium). Se
+				// pisa de vuelta justo despues de que la libreria termine.
+				canvas.style.width = "100%";
+				canvas.style.height = "auto";
+			})
+			.catch((err) => console.warn("qr render failed", err));
 	}, [value, resolution]);
 
 	return (
