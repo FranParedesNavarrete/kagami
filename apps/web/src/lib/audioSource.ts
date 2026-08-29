@@ -57,6 +57,69 @@ export async function listAudioInputDevices(): Promise<MediaDeviceInfo[]> {
 	return devices.filter((d) => d.kind === "audioinput");
 }
 
+export type MicrophoneAccessError = "denied" | "not-found" | "other";
+
+// Safari solo revela deviceId/label de enumerateDevices() tras una llamada
+// a getUserMedia que resuelva en ESTE documento, y exige que nazca de una
+// interaccion real del usuario (por eso esto se llama desde el manejador
+// de clic del boton, nunca desde un efecto). Si se concede permiso y no se
+// va a usar el stream todavia, se paran las pistas de inmediato.
+export async function requestMicrophoneAccess(): Promise<MicrophoneAccessError | null> {
+	try {
+		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		for (const track of stream.getTracks()) track.stop();
+		return null;
+	} catch (err) {
+		if (err instanceof DOMException && err.name === "NotAllowedError")
+			return "denied";
+		if (err instanceof DOMException && err.name === "NotFoundError")
+			return "not-found";
+		return "other";
+	}
+}
+
+export interface AudioDeviceSelection {
+	devices: MediaDeviceInfo[];
+	selectedId: string | null;
+}
+
+// Sin permiso concedido, el navegador no da una lista vacia: da una unica
+// entrada anonima por tipo de dispositivo (deviceId y label vacios). Se
+// descarta aqui para no confundirla con un dispositivo real.
+function hasUsableId(device: MediaDeviceInfo): boolean {
+	return device.deviceId !== "";
+}
+
+// "default" y "communications" son alias que Chrome añade sobre un
+// dispositivo real, no dispositivos nuevos — preseleccionar uno de ellos
+// puede apuntar a lo que el usuario NO eligio a proposito. Se prefiere
+// siempre un id concreto.
+export function pickDefaultAudioDevice(
+	devices: MediaDeviceInfo[],
+): string | null {
+	const concrete = devices.find(
+		(d) => d.deviceId !== "default" && d.deviceId !== "communications",
+	);
+	return (concrete ?? devices[0])?.deviceId ?? null;
+}
+
+export function deriveAudioDeviceSelection(
+	rawDevices: MediaDeviceInfo[],
+	currentSelectedId: string | null,
+): AudioDeviceSelection {
+	const devices = rawDevices.filter(hasUsableId);
+	if (devices.length === 0) return { devices: [], selectedId: null };
+	const keepCurrent =
+		currentSelectedId !== null &&
+		devices.some((d) => d.deviceId === currentSelectedId);
+	return {
+		devices,
+		selectedId: keepCurrent
+			? currentSelectedId
+			: pickDefaultAudioDevice(devices),
+	};
+}
+
 // echoCancellation/noiseSuppression/autoGainControl a false en las dos
 // vias: es audio de sistema (musica, un video, un juego), no una voz en
 // videollamada — el AGC es precisamente lo que sube y baja el volumen

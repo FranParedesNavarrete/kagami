@@ -11,9 +11,11 @@ import {
 import {
 	type AudioSource,
 	captureMedia,
+	deriveAudioDeviceSelection,
 	listAudioInputDevices,
 	loadAudioDeviceId,
 	loadAudioSource,
+	requestMicrophoneAccess,
 	saveAudioDeviceId,
 	saveAudioSource,
 	supportsSystemAudioCapture,
@@ -121,6 +123,13 @@ export function SenderView({ initialCode, onExit }: Props) {
 	const [audioDeviceId, setAudioDeviceId] = useState<string | null>(
 		loadAudioDeviceId,
 	);
+	// "idle" cubre tambien el caso de recargar la pagina con "input-device"
+	// ya guardado en localStorage: a proposito NO se pide permiso solo, hay
+	// que esperar al clic en "Allow microphone access" (Safari exige que
+	// getUserMedia nazca de una interaccion real, no de un efecto).
+	const [audioDeviceStatus, setAudioDeviceStatus] = useState<
+		"idle" | "requesting" | "ready" | "denied" | "not-found" | "error"
+	>("idle");
 	const [aspectMode, setAspectMode] = useState<AspectMode>(loadAspectMode);
 	const [braveDetected, setBraveDetected] = useState(false);
 	const [stats, setStats] = useState<LiveStats>(EMPTY_STATS);
@@ -139,12 +148,101 @@ export function SenderView({ initialCode, onExit }: Props) {
 		isBrave().then(setBraveDetected);
 	}, []);
 
+	// Repuebla la lista sola cuando aparece/desaparece un dispositivo (p.
+	// ej. activar BlackHole) sin que haga falta recargar la pagina.
 	useEffect(() => {
 		if (audioSource !== "input-device") return;
+		const onDeviceChange = () => {
+			listAudioInputDevices()
+				.then((raw) => {
+					const { devices, selectedId } = deriveAudioDeviceSelection(
+						raw,
+						audioDeviceId,
+					);
+					setAudioDevices(devices);
+					if (devices.length > 0) {
+						setAudioDeviceStatus("ready");
+						if (selectedId && selectedId !== audioDeviceId) {
+							setAudioDeviceId(selectedId);
+							saveAudioDeviceId(selectedId);
+						}
+					} else {
+						setAudioDeviceStatus((prev) =>
+							prev === "ready" ? "not-found" : prev,
+						);
+					}
+				})
+				.catch(() => setAudioDeviceStatus("error"));
+		};
+		navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
+		return () =>
+			navigator.mediaDevices.removeEventListener(
+				"devicechange",
+				onDeviceChange,
+			);
+	}, [audioSource, audioDeviceId]);
+
+	// Reenumera (sin volver a pedir permiso) al volver a "input-device"
+	// tras haber pasado por otro modo en esta misma sesion: una vez que
+	// getUserMedia resolvio una vez en este documento, enumerateDevices ya
+	// da labels sin exigir un nuevo gesto.
+	useEffect(() => {
+		if (audioSource !== "input-device" || audioDeviceStatus === "idle") return;
 		listAudioInputDevices()
-			.then(setAudioDevices)
-			.catch((err) => console.warn("enumerateDevices failed", err));
-	}, [audioSource]);
+			.then((raw) => {
+				const { devices, selectedId } = deriveAudioDeviceSelection(
+					raw,
+					audioDeviceId,
+				);
+				setAudioDevices(devices);
+				setAudioDeviceStatus(devices.length > 0 ? "ready" : "not-found");
+				if (selectedId && selectedId !== audioDeviceId) {
+					setAudioDeviceId(selectedId);
+					saveAudioDeviceId(selectedId);
+				}
+			})
+			.catch(() => {});
+	}, [audioSource, audioDeviceStatus, audioDeviceId]);
+
+	// Se llama SIEMPRE desde el manejador de clic de un boton, nunca desde
+	// un efecto: Safari solo revela deviceId/label tras un getUserMedia
+	// resuelto que nazca de una interaccion real del usuario.
+	const requestAudioDevices = useCallback(async () => {
+		setAudioDeviceStatus("requesting");
+		const permissionError = await requestMicrophoneAccess();
+		if (permissionError === "denied") {
+			setAudioDeviceStatus("denied");
+			return;
+		}
+		if (permissionError === "not-found") {
+			setAudioDeviceStatus("not-found");
+			return;
+		}
+		if (permissionError === "other") {
+			setAudioDeviceStatus("error");
+			return;
+		}
+		try {
+			const raw = await listAudioInputDevices();
+			const { devices, selectedId } = deriveAudioDeviceSelection(
+				raw,
+				audioDeviceId,
+			);
+			if (devices.length === 0) {
+				setAudioDevices([]);
+				setAudioDeviceStatus("not-found");
+				return;
+			}
+			setAudioDevices(devices);
+			setAudioDeviceStatus("ready");
+			if (selectedId && selectedId !== audioDeviceId) {
+				setAudioDeviceId(selectedId);
+				saveAudioDeviceId(selectedId);
+			}
+		} catch {
+			setAudioDeviceStatus("error");
+		}
+	}, [audioDeviceId]);
 
 	// startPeerConnection NO vuelve a pedir getDisplayMedia: reutiliza el
 	// stream ya capturado, tanto al empezar como en un restart-ice. Puede
@@ -592,6 +690,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 								onClick={() => {
 									setAudioSource("input-device");
 									saveAudioSource("input-device");
+									if (audioDeviceStatus === "idle") requestAudioDevices();
 								}}
 								className={
 									audioSource === "input-device"
@@ -621,25 +720,55 @@ export function SenderView({ initialCode, onExit }: Props) {
 								{t("sender.audioSourceHint")}
 							</p>
 						)}
-						{audioSource === "input-device" && (
-							<select
-								value={audioDeviceId ?? ""}
-								onChange={(e) => {
-									setAudioDeviceId(e.target.value);
-									saveAudioDeviceId(e.target.value);
-								}}
-								className="rounded-lg bg-neutral-800 px-3 py-2 text-sm text-white"
-							>
-								<option value="" disabled>
-									{t("sender.audioDevicePick")}
-								</option>
-								{audioDevices.map((device) => (
-									<option key={device.deviceId} value={device.deviceId}>
-										{device.label || device.deviceId.slice(0, 8)}
+						{audioSource === "input-device" &&
+							audioDeviceStatus === "ready" &&
+							audioDevices.length > 0 && (
+								<select
+									value={audioDeviceId ?? ""}
+									onChange={(e) => {
+										setAudioDeviceId(e.target.value);
+										saveAudioDeviceId(e.target.value);
+									}}
+									className="rounded-lg bg-neutral-800 px-3 py-2 text-sm text-white"
+								>
+									<option value="" disabled>
+										{t("sender.audioDevicePick")}
 									</option>
-								))}
-							</select>
-						)}
+									{audioDevices.map((device) => (
+										<option key={device.deviceId} value={device.deviceId}>
+											{device.label || device.deviceId.slice(0, 8)}
+										</option>
+									))}
+								</select>
+							)}
+						{audioSource === "input-device" &&
+							audioDeviceStatus !== "ready" && (
+								<div className="flex max-w-md flex-col items-center gap-2 text-center">
+									<p className="text-xs text-white/60">
+										{audioDeviceStatus === "requesting" &&
+											t("sender.audioPermissionRequesting")}
+										{audioDeviceStatus === "idle" &&
+											t("sender.audioPermissionNeeded")}
+										{audioDeviceStatus === "denied" &&
+											t("sender.audioPermissionDenied")}
+										{audioDeviceStatus === "not-found" &&
+											t("sender.audioNoDevices")}
+										{audioDeviceStatus === "error" &&
+											t("sender.audioPermissionError")}
+									</p>
+									{audioDeviceStatus !== "requesting" && (
+										<button
+											type="button"
+											onClick={requestAudioDevices}
+											className="rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-neutral-700"
+										>
+											{audioDeviceStatus === "idle"
+												? t("sender.audioGrantAccess")
+												: t("sender.audioRetry")}
+										</button>
+									)}
+								</div>
+							)}
 					</div>
 
 					<button

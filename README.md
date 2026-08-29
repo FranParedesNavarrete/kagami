@@ -61,6 +61,31 @@ Behind Caddy with the `casa` CLI: `sudo casa app alta kagami 7421`.
 That is the whole configuration. Rooms live in memory, files live in a
 temp dir with guaranteed cleanup; there is no database.
 
+## System audio on Safari and Firefox
+
+`getDisplayMedia({ audio: true })` only captures system audio on
+Chromium-based browsers. Safari ignores it entirely and Firefox doesn't
+support it, so sharing from either comes out silent unless you route
+system audio through an input device instead:
+
+1. Install [BlackHole](https://existential.audio/blackhole/) (the 2ch
+   build is enough).
+2. In **Audio MIDI Setup** (macOS, ships with the OS), create a
+   **Multi-Output Device** that includes both BlackHole and your real
+   speakers/headphones — without this you go silent locally while
+   sharing.
+3. In **System Settings → Sound → Output**, pick that Multi-Output
+   Device.
+4. In kagami's sender view, choose **"Input device"** as the audio
+   source and pick **BlackHole 2ch** from the list.
+
+The Multi-Output Device does not appear, and cannot appear, in kagami's
+selector — that selector lists audio *inputs*, and a Multi-Output
+Device is an output. Also: the browser hides real device names until it
+has granted microphone permission to the page at least once (Safari
+asks again on every page load, Chrome remembers it) — kagami requests
+that permission when you click "Input device", never silently.
+
 ## How it works
 
 The server (Fastify + WebSocket) hosts the pages and relays the WebRTC
