@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	CastUrlSchema,
 	ClientMessageSchema,
 	ROOM_CODE_ALPHABET,
 	RoomCodeSchema,
@@ -58,6 +59,93 @@ describe("ClientMessageSchema", () => {
 			ClientMessageSchema.safeParse({ type: "set-aspect-mode", mode: "32:9" })
 				.success,
 		).toBe(false);
+	});
+});
+
+describe("CastUrlSchema", () => {
+	it("accepts http and https URLs", () => {
+		expect(
+			CastUrlSchema.safeParse("https://example.com/video.mp4").success,
+		).toBe(true);
+		expect(
+			CastUrlSchema.safeParse("http://192.168.1.5/video.webm").success,
+		).toBe(true);
+	});
+
+	it("rejects any scheme other than http/https", () => {
+		for (const bad of [
+			"javascript:alert(1)",
+			"data:text/html,hi",
+			"file:///etc/passwd",
+			"ftp://example.com/video.mp4",
+		]) {
+			expect(CastUrlSchema.safeParse(bad).success).toBe(false);
+		}
+	});
+
+	it("rejects a string that isn't a URL at all", () => {
+		expect(CastUrlSchema.safeParse("not a url").success).toBe(false);
+	});
+});
+
+describe("cast messages in ClientMessageSchema/ServerMessageSchema", () => {
+	it("accepts cast-url with a valid scheme, rejects an invalid one", () => {
+		expect(
+			ClientMessageSchema.safeParse({
+				type: "cast-url",
+				url: "https://example.com/a.mp4",
+			}).success,
+		).toBe(true);
+		expect(
+			ClientMessageSchema.safeParse({
+				type: "cast-url",
+				url: "javascript:alert(1)",
+			}).success,
+		).toBe(false);
+	});
+
+	it("accepts cast-play/cast-pause with no payload", () => {
+		expect(ClientMessageSchema.safeParse({ type: "cast-play" }).success).toBe(
+			true,
+		);
+		expect(ClientMessageSchema.safeParse({ type: "cast-pause" }).success).toBe(
+			true,
+		);
+	});
+
+	it("accepts cast-seek with a non-negative position, rejects a negative one", () => {
+		expect(
+			ClientMessageSchema.safeParse({ type: "cast-seek", positionSec: 12.5 })
+				.success,
+		).toBe(true);
+		expect(
+			ClientMessageSchema.safeParse({ type: "cast-seek", positionSec: -1 })
+				.success,
+		).toBe(false);
+	});
+
+	it("accepts cast-volume within 0..1, rejects out of range", () => {
+		expect(
+			ClientMessageSchema.safeParse({ type: "cast-volume", volume: 0.5 })
+				.success,
+		).toBe(true);
+		expect(
+			ClientMessageSchema.safeParse({ type: "cast-volume", volume: 1.5 })
+				.success,
+		).toBe(false);
+	});
+
+	it("accepts a full cast-status round trip", () => {
+		const status = {
+			type: "cast-status" as const,
+			currentTimeSec: 12.3,
+			durationSec: 120,
+			paused: false,
+			ended: false,
+			errorMessage: null,
+		};
+		expect(ClientMessageSchema.safeParse(status).success).toBe(true);
+		expect(ServerMessageSchema.safeParse(status).success).toBe(true);
 	});
 });
 

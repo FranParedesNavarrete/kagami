@@ -92,6 +92,41 @@ export function registerSignaling(
 							mode: msg.mode,
 						});
 					break;
+				case "cast-url":
+					if (code && role)
+						rooms.relay(code, role, { type: "cast-url", url: msg.url });
+					break;
+				case "cast-play":
+					if (code && role) rooms.relay(code, role, { type: "cast-play" });
+					break;
+				case "cast-pause":
+					if (code && role) rooms.relay(code, role, { type: "cast-pause" });
+					break;
+				case "cast-seek":
+					if (code && role)
+						rooms.relay(code, role, {
+							type: "cast-seek",
+							positionSec: msg.positionSec,
+						});
+					break;
+				case "cast-volume":
+					if (code && role)
+						rooms.relay(code, role, {
+							type: "cast-volume",
+							volume: msg.volume,
+						});
+					break;
+				case "cast-status":
+					if (code && role)
+						rooms.relay(code, role, {
+							type: "cast-status",
+							currentTimeSec: msg.currentTimeSec,
+							durationSec: msg.durationSec,
+							paused: msg.paused,
+							ended: msg.ended,
+							errorMessage: msg.errorMessage,
+						});
+					break;
 				case "leave":
 					if (code && role) rooms.leave(code, role);
 					code = null;

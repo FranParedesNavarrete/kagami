@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DebugOverlay } from "../../components/DebugOverlay.js";
 import { QrCode } from "../../components/QrCode.js";
 import { useSignaling } from "../../hooks/useSignaling.js";
-import { useI18n } from "../../i18n/i18n.js";
+import { type I18nKey, useI18n } from "../../i18n/i18n.js";
 import {
 	type AspectMode,
 	containerStyleForAspect,
 	videoObjectFitForAspect,
 } from "../../lib/aspect.js";
+import { type MediaErrorKind, mediaErrorKind } from "../../lib/mediaError.js";
 import {
 	type PeerSession,
 	RTC_CONFIG,
@@ -15,6 +16,10 @@ import {
 	iceCandidateToMessage,
 } from "../../lib/webrtc.js";
 import { getInboundVideoStats } from "../../lib/webrtcStats.js";
+
+function mediaErrorKey(kind: MediaErrorKind): I18nKey {
+	return `mediaError.${kind}` as I18nKey;
+}
 
 const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
 
@@ -39,6 +44,12 @@ type ScreenState =
 	| { phase: "code"; code: string; expiresInMs: number }
 	| { phase: "peer-connecting" }
 	| { phase: "sharing" }
+	| {
+			phase: "casting";
+			url: string;
+			needsInteraction: boolean;
+			errorKind: MediaErrorKind | null;
+	  }
 	| { phase: "stalled" }
 	| { phase: "error"; message: string };
 
@@ -54,9 +65,35 @@ export function ScreenView() {
 	const [debugInfo, setDebugInfo] = useState<Record<string, string>>({});
 	const [aspectMode, setAspectMode] = useState<AspectMode>("auto");
 	const videoRef = useRef<HTMLVideoElement>(null);
+	const castVideoRef = useRef<HTMLVideoElement>(null);
 	const sessionRef = useRef<PeerSession | null>(null);
 	const statsIntervalRef = useRef<number | null>(null);
 	const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+	// El switch de mensajes WS vive en un efecto que no se re-suscribe en
+	// cada render (deps abajo) — leer `state.phase` ahi dentro daria un
+	// valor obsoleto. Un ref se actualiza sin re-suscribir nada, igual que
+	// ya hace `streamRef`/`sessionRef` en el resto de esta vista.
+	const phaseRef = useRef<ScreenState["phase"]>("connecting");
+	useEffect(() => {
+		phaseRef.current = state.phase;
+	}, [state.phase]);
+
+	// Intento de autoplay explicito (no el atributo HTML) para poder
+	// capturar el rechazo: si la tele exige interaccion, se pide con letra
+	// enorme en vez de quedarse en negro (encargo M1, parte 2). M-1 midio
+	// que el autoplay sin interaccion SI funciona en esta LG — esto es la
+	// red de seguridad para cuando no sea el caso (otra tele, otro navegador).
+	const castUrl = state.phase === "casting" ? state.url : null;
+	useEffect(() => {
+		if (castUrl === null) return;
+		const video = castVideoRef.current;
+		if (!video) return;
+		video.play().catch(() => {
+			setState((prev) =>
+				prev.phase === "casting" ? { ...prev, needsInteraction: true } : prev,
+			);
+		});
+	}, [castUrl]);
 
 	useEffect(() => {
 		if (status === "open") send({ type: "create-room" });
@@ -81,7 +118,8 @@ export function ScreenView() {
 	// por JS — hay que desactivar el salvapantallas en la propia tele
 	// (no es el modo eco). Ver docs/webrtc-quality.md.
 	useEffect(() => {
-		if (state.phase !== "sharing" || !("wakeLock" in navigator)) return;
+		const active = state.phase === "sharing" || state.phase === "casting";
+		if (!active || !("wakeLock" in navigator)) return;
 		let cancelled = false;
 		navigator.wakeLock
 			.request("screen")
@@ -106,6 +144,28 @@ export function ScreenView() {
 			statsIntervalRef.current = null;
 		}
 	}, []);
+
+	// El error, una vez ocurre, sigue activo hasta el proximo cast-url —
+	// no hasta el proximo evento del <video> (timeupdate/pause siguen
+	// disparandose despues de un error y mandaban errorMessage:null,
+	// borrando el aviso en el emisor un instante despues de mostrarlo).
+	const castErrorRef = useRef<MediaErrorKind | null>(null);
+
+	// Refleja el estado real del <video> de cast en el emisor (posicion,
+	// duracion, pausado, terminado, error) — el emisor no tiene forma
+	// propia de saberlo, el video vive solo en la tele.
+	const reportCastStatus = useCallback(() => {
+		const video = castVideoRef.current;
+		if (!video) return;
+		send({
+			type: "cast-status",
+			currentTimeSec: video.currentTime,
+			durationSec: Number.isFinite(video.duration) ? video.duration : null,
+			paused: video.paused,
+			ended: video.ended,
+			errorMessage: castErrorRef.current,
+		});
+	}, [send]);
 
 	// Vigila framesDecoded cada segundo. Si la conexion sigue "connected"
 	// pero los frames dejan de avanzar, pide un restart-ice al emisor; si
@@ -225,7 +285,58 @@ export function ScreenView() {
 						setAspectMode(msg.mode);
 						break;
 
+					case "cast-url":
+						// Un cast puede llegar en cualquier estado previo (recien
+						// emparejado, o cambiando de espejo a cast en la misma sala) —
+						// se cierra cualquier PeerConnection de espejo que hubiera.
+						stopStatsWatcher();
+						sessionRef.current?.pc.close();
+						sessionRef.current = null;
+						if (videoRef.current) videoRef.current.srcObject = null;
+						castErrorRef.current = null;
+						setState({
+							phase: "casting",
+							url: msg.url,
+							needsInteraction: false,
+							errorKind: null,
+						});
+						break;
+
+					case "cast-play":
+						castVideoRef.current?.play().catch(() => {
+							setState((prev) =>
+								prev.phase === "casting"
+									? { ...prev, needsInteraction: true }
+									: prev,
+							);
+						});
+						break;
+
+					case "cast-pause":
+						castVideoRef.current?.pause();
+						break;
+
+					case "cast-seek":
+						if (castVideoRef.current)
+							castVideoRef.current.currentTime = msg.positionSec;
+						break;
+
+					case "cast-volume":
+						if (castVideoRef.current)
+							castVideoRef.current.volume = Math.min(
+								1,
+								Math.max(0, msg.volume),
+							);
+						break;
+
 					case "peer-left":
+						// Es justo la ventaja del cast frente al espejo (SPECS.md §2):
+						// el emisor puede desconectarse (bloquear el telefono) sin que
+						// el video se detenga — vive solo en el <video> de la tele, no
+						// depende de que el WS del emisor siga vivo. El control remoto
+						// se pierde hasta que alguien entre con un codigo nuevo, pero
+						// la reproduccion sigue.
+						if (phaseRef.current === "casting") break;
 						stopStatsWatcher();
 						sessionRef.current?.pc.close();
 						sessionRef.current = null;
@@ -274,7 +385,73 @@ export function ScreenView() {
 				/>
 			</div>
 
-			{state.phase !== "sharing" && (
+			{state.phase === "casting" && (
+				<div className="relative flex h-full w-full items-center justify-center">
+					{/* biome-ignore lint/a11y/useMediaCaption: cast de un video externo del emisor, sin pista de subtitulos que adjuntar */}
+					<video
+						ref={castVideoRef}
+						data-testid="cast-video"
+						src={state.url}
+						playsInline
+						className="h-full w-full"
+						style={{ objectFit: "contain" }}
+						onLoadedMetadata={() => reportCastStatus()}
+						onTimeUpdate={() => reportCastStatus()}
+						onPlay={() => {
+							setState((prev) =>
+								prev.phase === "casting"
+									? { ...prev, needsInteraction: false }
+									: prev,
+							);
+							reportCastStatus();
+						}}
+						onPause={() => reportCastStatus()}
+						onEnded={() => reportCastStatus()}
+						onError={(ev) => {
+							const kind = mediaErrorKind(ev.currentTarget.error);
+							castErrorRef.current = kind;
+							setState((prev) =>
+								prev.phase === "casting" ? { ...prev, errorKind: kind } : prev,
+							);
+							reportCastStatus();
+						}}
+					/>
+					{state.needsInteraction && !state.errorKind && (
+						<div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/80 text-center">
+							<p className="text-4xl">{t("screen.castTapToPlay")}</p>
+							<button
+								type="button"
+								onClick={() => {
+									castVideoRef.current
+										?.play()
+										.then(() => {
+											setState((prev) =>
+												prev.phase === "casting"
+													? { ...prev, needsInteraction: false }
+													: prev,
+											);
+										})
+										.catch(() => {});
+								}}
+								className="rounded-xl bg-blue-600 px-10 py-5 text-3xl font-semibold"
+							>
+								{t("screen.castTapToPlayButton")}
+							</button>
+						</div>
+					)}
+					{state.errorKind && (
+						<div className="absolute inset-0 flex items-center justify-center bg-black/90">
+							<p className="max-w-2xl px-6 text-3xl text-red-400">
+								{t("screen.castErrorPrefix", {
+									message: t(mediaErrorKey(state.errorKind)),
+								})}
+							</p>
+						</div>
+					)}
+				</div>
+			)}
+
+			{state.phase !== "sharing" && state.phase !== "casting" && (
 				<div className="flex flex-col items-center gap-6 text-center">
 					{state.phase === "connecting" && (
 						<p className="text-4xl">{t("screen.connecting")}</p>

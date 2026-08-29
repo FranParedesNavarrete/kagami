@@ -1,5 +1,9 @@
-import type { AspectMode, ServerMessage } from "@kagami/shared";
-import { Mic, MicOff, MonitorUp } from "lucide-react";
+import {
+	type AspectMode,
+	CastUrlSchema,
+	type ServerMessage,
+} from "@kagami/shared";
+import { Mic, MicOff, MonitorUp, Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSignaling } from "../../hooks/useSignaling.js";
 import { type I18nKey, useI18n } from "../../i18n/i18n.js";
@@ -59,11 +63,38 @@ import {
 
 type SenderState =
 	| { phase: "joining" }
-	| { phase: "ios-blocked" }
 	| { phase: "ready"; error?: string }
 	| { phase: "sharing"; label: string; hasAudio: boolean }
 	| { phase: "session-ended"; reason: "screen-ended" | "self-stopped" }
 	| { phase: "error"; message: string };
+
+type SenderMode = "mirror" | "cast";
+
+interface CastPlaybackState {
+	url: string | null;
+	currentTimeSec: number;
+	durationSec: number | null;
+	paused: boolean;
+	ended: boolean;
+	errorMessage: string | null;
+}
+
+const EMPTY_CAST_STATE: CastPlaybackState = {
+	url: null,
+	currentTimeSec: 0,
+	durationSec: null,
+	paused: true,
+	ended: false,
+	errorMessage: null,
+};
+
+function formatTime(seconds: number | null): string {
+	if (seconds === null || !Number.isFinite(seconds)) return "--:--";
+	const total = Math.max(0, Math.round(seconds));
+	const mins = Math.floor(total / 60);
+	const secs = total % 60;
+	return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
 
 interface LiveStats {
 	codec: string | null;
@@ -133,6 +164,16 @@ export function SenderView({ initialCode, onExit }: Props) {
 	const [aspectMode, setAspectMode] = useState<AspectMode>(loadAspectMode);
 	const [braveDetected, setBraveDetected] = useState(false);
 	const [stats, setStats] = useState<LiveStats>(EMPTY_STATS);
+	// canMirror() es fijo por navegador (no cambia en caliente): en iOS
+	// arranca directo en "cast", en el resto en "mirror" — el desktop
+	// sigue viendo el flujo de espejo tal cual estaba.
+	const [senderMode, setSenderMode] = useState<SenderMode>(() =>
+		canMirror() ? "mirror" : "cast",
+	);
+	const [castUrlInput, setCastUrlInput] = useState("");
+	const [castUrlError, setCastUrlError] = useState<string | null>(null);
+	const [castStatus, setCastStatus] =
+		useState<CastPlaybackState>(EMPTY_CAST_STATE);
 	const sessionRef = useRef<PeerSession | null>(null);
 	const streamRef = useRef<MediaStream | null>(null);
 	const joinedRef = useRef(false);
@@ -244,6 +285,27 @@ export function SenderView({ initialCode, onExit }: Props) {
 		}
 	}, [audioDeviceId]);
 
+	// Validacion estricta de esquema en el propio cliente (SPECS.md §2): el
+	// servidor tambien valida con el mismo CastUrlSchema al relayar el
+	// mensaje (ver apps/server/src/ws/signaling.ts) — "los dos lados", no
+	// solo confiar en que el formulario ya filtro bien.
+	const submitCastUrl = useCallback(() => {
+		const parsed = CastUrlSchema.safeParse(castUrlInput.trim());
+		if (!parsed.success) {
+			setCastUrlError(t("sender.castUrlInvalid"));
+			return;
+		}
+		setCastUrlError(null);
+		send({ type: "cast-url", url: parsed.data });
+		setCastStatus({ ...EMPTY_CAST_STATE, url: parsed.data });
+	}, [castUrlInput, send, t]);
+
+	const castNewUrl = useCallback(() => {
+		setCastStatus(EMPTY_CAST_STATE);
+		setCastUrlInput("");
+		setCastUrlError(null);
+	}, []);
+
 	// startPeerConnection NO vuelve a pedir getDisplayMedia: reutiliza el
 	// stream ya capturado, tanto al empezar como en un restart-ice. Puede
 	// lanzar UnsupportedCodecError si el navegador no ofrece H.264 ni VP8.
@@ -297,9 +359,17 @@ export function SenderView({ initialCode, onExit }: Props) {
 			subscribe((msg: ServerMessage) => {
 				switch (msg.type) {
 					case "room-joined":
-						setState(
-							canMirror() ? { phase: "ready" } : { phase: "ios-blocked" },
-						);
+						setState({ phase: "ready" });
+						break;
+					case "cast-status":
+						setCastStatus((prev) => ({
+							...prev,
+							currentTimeSec: msg.currentTimeSec,
+							durationSec: msg.durationSec,
+							paused: msg.paused,
+							ended: msg.ended,
+							errorMessage: msg.errorMessage,
+						}));
 						break;
 					case "answer":
 						sessionRef.current?.setRemoteDescription(msg.sdp);
@@ -544,243 +614,395 @@ export function SenderView({ initialCode, onExit }: Props) {
 				<p className="text-2xl">{t("sender.joining")}</p>
 			)}
 
-			{state.phase === "ios-blocked" && (
-				<div className="max-w-md space-y-3">
-					<h2 className="text-2xl font-bold">{t("sender.iosTitle")}</h2>
-					<p className="text-white/70">{t("sender.iosBody")}</p>
-				</div>
-			)}
-
 			{state.phase === "ready" && (
 				<>
-					{braveDetected && (
-						<p className="max-w-md text-sm text-yellow-400">
-							{t("sender.braveWarning")}
-						</p>
-					)}
-					{isSafari() && (
-						<p className="max-w-md text-sm text-white/50">
-							{t("sender.safariNote")}
-						</p>
+					{!canMirror() && (
+						<div className="max-w-md space-y-2">
+							<h2 className="text-xl font-bold">{t("sender.iosTitle")}</h2>
+							<p className="text-sm text-white/70">{t("sender.iosBody")}</p>
+						</div>
 					)}
 
-					<div className="flex flex-col items-center gap-2">
-						<span className="text-sm text-white/60">
-							{t("sender.codecPreference")}
-						</span>
+					{canMirror() && (
 						<div className="flex gap-2">
-							{(["vp8", "h264", "auto"] as const).map((pref) => (
-								<button
-									key={pref}
-									type="button"
-									onClick={() => {
-										setCodecPref(pref);
-										saveCodecPreference(pref);
-									}}
-									className={
-										pref === codecPref
-											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold uppercase"
-											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm uppercase text-white/70"
-									}
-								>
-									{pref}
-								</button>
-							))}
-						</div>
-						{chromeH264Warning && (
-							<p className="max-w-md text-sm text-yellow-400">
-								{t("sender.chromeH264Warning")}
-							</p>
-						)}
-					</div>
-
-					<div className="flex flex-col items-center gap-2">
-						<span className="text-sm text-white/60">
-							{t("sender.resolution")}
-						</span>
-						<div className="flex gap-2">
-							{RESOLUTION_PRESETS.map((preset) => (
-								<button
-									key={preset.id}
-									type="button"
-									onClick={() => {
-										setResolutionPreset(preset);
-										saveResolutionPreset(preset);
-									}}
-									className={
-										preset.id === resolutionPreset.id
-											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
-											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
-									}
-								>
-									{preset.label}
-								</button>
-							))}
-						</div>
-					</div>
-
-					<div className="flex flex-col items-center gap-2">
-						<span className="text-sm text-white/60">{t("sender.quality")}</span>
-						<div className="flex gap-2">
-							{QUALITY_PRESETS.map((preset) => (
-								<button
-									key={preset.id}
-									type="button"
-									onClick={() => {
-										setQuality(preset);
-										saveQualityPreset(preset);
-									}}
-									className={
-										preset.id === quality.id
-											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
-											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
-									}
-								>
-									{preset.label}
-								</button>
-							))}
-						</div>
-					</div>
-
-					<div className="flex flex-col items-center gap-2">
-						<span className="text-sm text-white/60">
-							{t("sender.contentHint")}
-						</span>
-						<div className="flex gap-2">
-							{(["detail", "motion"] as const).map((hint) => (
-								<button
-									key={hint}
-									type="button"
-									onClick={() => setContentHint(hint)}
-									className={
-										hint === contentHint
-											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold uppercase"
-											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm uppercase text-white/70"
-									}
-								>
-									{hint}
-								</button>
-							))}
-						</div>
-					</div>
-
-					<div className="flex flex-col items-center gap-2">
-						<span className="text-sm text-white/60">
-							{t("sender.audioSource")}
-						</span>
-						<div className="flex gap-2">
-							{supportsSystemAudioCapture() && (
-								<button
-									type="button"
-									onClick={() => {
-										setAudioSource("system");
-										saveAudioSource("system");
-									}}
-									className={
-										audioSource === "system"
-											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
-											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
-									}
-								>
-									{t("sender.audioSourceSystem")}
-								</button>
-							)}
 							<button
 								type="button"
-								onClick={() => {
-									setAudioSource("input-device");
-									saveAudioSource("input-device");
-									if (audioDeviceStatus === "idle") requestAudioDevices();
-								}}
+								onClick={() => setSenderMode("mirror")}
 								className={
-									audioSource === "input-device"
+									senderMode === "mirror"
 										? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
 										: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
 								}
 							>
-								{t("sender.audioSourceDevice")}
+								{t("sender.modeMirror")}
 							</button>
 							<button
 								type="button"
-								onClick={() => {
-									setAudioSource("none");
-									saveAudioSource("none");
-								}}
+								onClick={() => setSenderMode("cast")}
 								className={
-									audioSource === "none"
+									senderMode === "cast"
 										? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
 										: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
 								}
 							>
-								{t("sender.audioSourceNone")}
+								{t("sender.modeCast")}
 							</button>
 						</div>
-						{!supportsSystemAudioCapture() && (
-							<p className="max-w-md text-xs text-white/40">
-								{t("sender.audioSourceHint")}
-							</p>
-						)}
-						{audioSource === "input-device" &&
-							audioDeviceStatus === "ready" &&
-							audioDevices.length > 0 && (
-								<select
-									value={audioDeviceId ?? ""}
-									onChange={(e) => {
-										setAudioDeviceId(e.target.value);
-										saveAudioDeviceId(e.target.value);
-									}}
-									className="rounded-lg bg-neutral-800 px-3 py-2 text-sm text-white"
-								>
-									<option value="" disabled>
-										{t("sender.audioDevicePick")}
-									</option>
-									{audioDevices.map((device) => (
-										<option key={device.deviceId} value={device.deviceId}>
-											{device.label || device.deviceId.slice(0, 8)}
-										</option>
-									))}
-								</select>
-							)}
-						{audioSource === "input-device" &&
-							audioDeviceStatus !== "ready" && (
-								<div className="flex max-w-md flex-col items-center gap-2 text-center">
-									<p className="text-xs text-white/60">
-										{audioDeviceStatus === "requesting" &&
-											t("sender.audioPermissionRequesting")}
-										{audioDeviceStatus === "idle" &&
-											t("sender.audioPermissionNeeded")}
-										{audioDeviceStatus === "denied" &&
-											t("sender.audioPermissionDenied")}
-										{audioDeviceStatus === "not-found" &&
-											t("sender.audioNoDevices")}
-										{audioDeviceStatus === "error" &&
-											t("sender.audioPermissionError")}
+					)}
+
+					{senderMode === "cast" && (
+						<div className="flex w-full max-w-md flex-col items-center gap-4">
+							{castStatus.url === null ? (
+								<>
+									<input
+										type="url"
+										inputMode="url"
+										data-testid="cast-url-input"
+										value={castUrlInput}
+										onChange={(e) => setCastUrlInput(e.target.value)}
+										placeholder={t("sender.castUrlPlaceholder")}
+										className="w-full rounded-lg bg-neutral-800 px-4 py-3 text-sm text-white placeholder:text-white/30"
+									/>
+									{castUrlError && (
+										<p className="text-sm text-red-400">{castUrlError}</p>
+									)}
+									<button
+										type="button"
+										data-testid="cast-url-submit"
+										onClick={submitCastUrl}
+										disabled={castUrlInput.trim().length === 0}
+										className="flex items-center gap-3 rounded-xl bg-blue-600 px-8 py-4 text-xl font-semibold hover:bg-blue-500 disabled:bg-neutral-700 disabled:text-white/40"
+									>
+										{t("sender.castUrlSubmit")}
+									</button>
+								</>
+							) : (
+								<>
+									<p className="max-w-md truncate text-sm text-white/60">
+										{t("sender.castNowPlaying", { url: castStatus.url })}
 									</p>
-									{audioDeviceStatus !== "requesting" && (
+									{castStatus.errorMessage ? (
+										<p className="text-red-400">
+											{t("sender.castErrorPrefix", {
+												message: t(
+													`mediaError.${castStatus.errorMessage}` as I18nKey,
+												),
+											})}
+										</p>
+									) : (
+										<>
+											<button
+												type="button"
+												data-testid="cast-play-pause"
+												onClick={() =>
+													send({
+														type: castStatus.paused
+															? "cast-play"
+															: "cast-pause",
+													})
+												}
+												className="flex items-center gap-3 rounded-xl bg-blue-600 px-8 py-4 text-xl font-semibold hover:bg-blue-500"
+											>
+												{castStatus.paused ? (
+													<Play size={24} />
+												) : (
+													<Pause size={24} />
+												)}
+												{castStatus.paused
+													? t("sender.castPlay")
+													: t("sender.castPause")}
+											</button>
+											<div className="flex w-full items-center gap-3">
+												<span className="w-24 shrink-0 font-mono text-xs text-white/60">
+													{t("sender.castPositionLabel", {
+														current: formatTime(castStatus.currentTimeSec),
+														duration: formatTime(castStatus.durationSec),
+													})}
+												</span>
+												<input
+													type="range"
+													data-testid="cast-seek"
+													min={0}
+													max={castStatus.durationSec ?? 0}
+													step={0.1}
+													value={castStatus.currentTimeSec}
+													onChange={(e) =>
+														send({
+															type: "cast-seek",
+															positionSec: Number(e.target.value),
+														})
+													}
+													className="w-full"
+												/>
+											</div>
+											<div className="flex w-full items-center gap-3">
+												<span className="w-24 shrink-0 text-xs text-white/60">
+													{t("sender.castVolumeLabel")}
+												</span>
+												<input
+													type="range"
+													data-testid="cast-volume"
+													min={0}
+													max={1}
+													step={0.01}
+													defaultValue={1}
+													onChange={(e) =>
+														send({
+															type: "cast-volume",
+															volume: Number(e.target.value),
+														})
+													}
+													className="w-full"
+												/>
+											</div>
+										</>
+									)}
+									<button
+										type="button"
+										onClick={castNewUrl}
+										className="text-sm text-white/50 underline"
+									>
+										{t("sender.castChangeUrl")}
+									</button>
+								</>
+							)}
+						</div>
+					)}
+
+					{senderMode === "mirror" && canMirror() && (
+						<>
+							{braveDetected && (
+								<p className="max-w-md text-sm text-yellow-400">
+									{t("sender.braveWarning")}
+								</p>
+							)}
+							{isSafari() && (
+								<p className="max-w-md text-sm text-white/50">
+									{t("sender.safariNote")}
+								</p>
+							)}
+
+							<div className="flex flex-col items-center gap-2">
+								<span className="text-sm text-white/60">
+									{t("sender.codecPreference")}
+								</span>
+								<div className="flex gap-2">
+									{(["vp8", "h264", "auto"] as const).map((pref) => (
+										<button
+											key={pref}
+											type="button"
+											onClick={() => {
+												setCodecPref(pref);
+												saveCodecPreference(pref);
+											}}
+											className={
+												pref === codecPref
+													? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold uppercase"
+													: "rounded-lg bg-neutral-800 px-4 py-2 text-sm uppercase text-white/70"
+											}
+										>
+											{pref}
+										</button>
+									))}
+								</div>
+								{chromeH264Warning && (
+									<p className="max-w-md text-sm text-yellow-400">
+										{t("sender.chromeH264Warning")}
+									</p>
+								)}
+							</div>
+
+							<div className="flex flex-col items-center gap-2">
+								<span className="text-sm text-white/60">
+									{t("sender.resolution")}
+								</span>
+								<div className="flex gap-2">
+									{RESOLUTION_PRESETS.map((preset) => (
+										<button
+											key={preset.id}
+											type="button"
+											onClick={() => {
+												setResolutionPreset(preset);
+												saveResolutionPreset(preset);
+											}}
+											className={
+												preset.id === resolutionPreset.id
+													? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+													: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+											}
+										>
+											{preset.label}
+										</button>
+									))}
+								</div>
+							</div>
+
+							<div className="flex flex-col items-center gap-2">
+								<span className="text-sm text-white/60">
+									{t("sender.quality")}
+								</span>
+								<div className="flex gap-2">
+									{QUALITY_PRESETS.map((preset) => (
+										<button
+											key={preset.id}
+											type="button"
+											onClick={() => {
+												setQuality(preset);
+												saveQualityPreset(preset);
+											}}
+											className={
+												preset.id === quality.id
+													? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+													: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+											}
+										>
+											{preset.label}
+										</button>
+									))}
+								</div>
+							</div>
+
+							<div className="flex flex-col items-center gap-2">
+								<span className="text-sm text-white/60">
+									{t("sender.contentHint")}
+								</span>
+								<div className="flex gap-2">
+									{(["detail", "motion"] as const).map((hint) => (
+										<button
+											key={hint}
+											type="button"
+											onClick={() => setContentHint(hint)}
+											className={
+												hint === contentHint
+													? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold uppercase"
+													: "rounded-lg bg-neutral-800 px-4 py-2 text-sm uppercase text-white/70"
+											}
+										>
+											{hint}
+										</button>
+									))}
+								</div>
+							</div>
+
+							<div className="flex flex-col items-center gap-2">
+								<span className="text-sm text-white/60">
+									{t("sender.audioSource")}
+								</span>
+								<div className="flex gap-2">
+									{supportsSystemAudioCapture() && (
 										<button
 											type="button"
-											onClick={requestAudioDevices}
-											className="rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-neutral-700"
+											onClick={() => {
+												setAudioSource("system");
+												saveAudioSource("system");
+											}}
+											className={
+												audioSource === "system"
+													? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+													: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+											}
 										>
-											{audioDeviceStatus === "idle"
-												? t("sender.audioGrantAccess")
-												: t("sender.audioRetry")}
+											{t("sender.audioSourceSystem")}
 										</button>
 									)}
+									<button
+										type="button"
+										onClick={() => {
+											setAudioSource("input-device");
+											saveAudioSource("input-device");
+											if (audioDeviceStatus === "idle") requestAudioDevices();
+										}}
+										className={
+											audioSource === "input-device"
+												? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+												: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+										}
+									>
+										{t("sender.audioSourceDevice")}
+									</button>
+									<button
+										type="button"
+										onClick={() => {
+											setAudioSource("none");
+											saveAudioSource("none");
+										}}
+										className={
+											audioSource === "none"
+												? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+												: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+										}
+									>
+										{t("sender.audioSourceNone")}
+									</button>
 								</div>
-							)}
-					</div>
+								{!supportsSystemAudioCapture() && (
+									<p className="max-w-md text-xs text-white/40">
+										{t("sender.audioSourceHint")}
+									</p>
+								)}
+								{audioSource === "input-device" &&
+									audioDeviceStatus === "ready" &&
+									audioDevices.length > 0 && (
+										<select
+											value={audioDeviceId ?? ""}
+											onChange={(e) => {
+												setAudioDeviceId(e.target.value);
+												saveAudioDeviceId(e.target.value);
+											}}
+											className="rounded-lg bg-neutral-800 px-3 py-2 text-sm text-white"
+										>
+											<option value="" disabled>
+												{t("sender.audioDevicePick")}
+											</option>
+											{audioDevices.map((device) => (
+												<option key={device.deviceId} value={device.deviceId}>
+													{device.label || device.deviceId.slice(0, 8)}
+												</option>
+											))}
+										</select>
+									)}
+								{audioSource === "input-device" &&
+									audioDeviceStatus !== "ready" && (
+										<div className="flex max-w-md flex-col items-center gap-2 text-center">
+											<p className="text-xs text-white/60">
+												{audioDeviceStatus === "requesting" &&
+													t("sender.audioPermissionRequesting")}
+												{audioDeviceStatus === "idle" &&
+													t("sender.audioPermissionNeeded")}
+												{audioDeviceStatus === "denied" &&
+													t("sender.audioPermissionDenied")}
+												{audioDeviceStatus === "not-found" &&
+													t("sender.audioNoDevices")}
+												{audioDeviceStatus === "error" &&
+													t("sender.audioPermissionError")}
+											</p>
+											{audioDeviceStatus !== "requesting" && (
+												<button
+													type="button"
+													onClick={requestAudioDevices}
+													className="rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-neutral-700"
+												>
+													{audioDeviceStatus === "idle"
+														? t("sender.audioGrantAccess")
+														: t("sender.audioRetry")}
+												</button>
+											)}
+										</div>
+									)}
+							</div>
 
-					<button
-						type="button"
-						onClick={shareScreen}
-						className="flex items-center gap-3 rounded-xl bg-blue-600 px-8 py-4 text-xl font-semibold hover:bg-blue-500"
-					>
-						<MonitorUp size={28} />
-						{t("sender.shareScreen")}
-					</button>
-					{state.error && (
-						<p className="max-w-md text-red-400">{state.error}</p>
+							<button
+								type="button"
+								onClick={shareScreen}
+								className="flex items-center gap-3 rounded-xl bg-blue-600 px-8 py-4 text-xl font-semibold hover:bg-blue-500"
+							>
+								<MonitorUp size={28} />
+								{t("sender.shareScreen")}
+							</button>
+							{state.error && (
+								<p className="max-w-md text-red-400">{state.error}</p>
+							)}
+						</>
 					)}
 				</>
 			)}

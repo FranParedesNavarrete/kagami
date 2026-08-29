@@ -39,6 +39,26 @@ export const AspectModeSchema = z.enum([
 ]);
 export type AspectMode = z.infer<typeof AspectModeSchema>;
 
+// Cast de URL (SPECS.md §2): solo http/https, nunca otro esquema
+// (javascript:, data:, file:...). z.string().url() valida sintaxis pero
+// acepta cualquier esquema absoluto, de ahi el refine explicito con el
+// mensaje de rechazo que exige el encargo.
+export const CastUrlSchema = z.string().superRefine((value, ctx) => {
+	let parsed: URL;
+	try {
+		parsed = new URL(value);
+	} catch {
+		ctx.addIssue({ code: z.ZodIssueCode.custom, message: "invalid URL" });
+		return;
+	}
+	if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "only http:// and https:// URLs are supported",
+		});
+	}
+});
+
 // Mensajes cliente -> server. Un mensaje que no valida se rechaza con log,
 // nunca se procesa "a ver si cuela" (CODESTYLE.md §2).
 export const ClientMessageSchema = z.discriminatedUnion("type", [
@@ -50,10 +70,28 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("leave") }),
 	z.object({ type: z.literal("restart-ice") }),
 	z.object({ type: z.literal("set-aspect-mode"), mode: AspectModeSchema }),
+	z.object({ type: z.literal("cast-url"), url: CastUrlSchema }),
+	z.object({ type: z.literal("cast-play") }),
+	z.object({ type: z.literal("cast-pause") }),
+	z.object({ type: z.literal("cast-seek"), positionSec: z.number().min(0) }),
+	z.object({
+		type: z.literal("cast-volume"),
+		volume: z.number().min(0).max(1),
+	}),
+	z.object({
+		type: z.literal("cast-status"),
+		currentTimeSec: z.number().min(0),
+		durationSec: z.number().min(0).nullable(),
+		paused: z.boolean(),
+		ended: z.boolean(),
+		errorMessage: z.string().nullable(),
+	}),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
-// Mensajes server -> cliente.
+// Mensajes server -> cliente. Los mensajes de cast se relayan tal cual
+// entre emisor y pantalla (igual que offer/answer/ice), asi que su forma
+// se repite identica a la de ClientMessageSchema.
 export const ServerMessageSchema = z.discriminatedUnion("type", [
 	z.object({
 		type: z.literal("room-created"),
@@ -68,6 +106,22 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("peer-left") }),
 	z.object({ type: z.literal("restart-ice") }),
 	z.object({ type: z.literal("set-aspect-mode"), mode: AspectModeSchema }),
+	z.object({ type: z.literal("cast-url"), url: CastUrlSchema }),
+	z.object({ type: z.literal("cast-play") }),
+	z.object({ type: z.literal("cast-pause") }),
+	z.object({ type: z.literal("cast-seek"), positionSec: z.number().min(0) }),
+	z.object({
+		type: z.literal("cast-volume"),
+		volume: z.number().min(0).max(1),
+	}),
+	z.object({
+		type: z.literal("cast-status"),
+		currentTimeSec: z.number().min(0),
+		durationSec: z.number().min(0).nullable(),
+		paused: z.boolean(),
+		ended: z.boolean(),
+		errorMessage: z.string().nullable(),
+	}),
 	z.object({
 		type: z.literal("error"),
 		code: z.enum([
