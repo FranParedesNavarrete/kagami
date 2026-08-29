@@ -28,6 +28,9 @@ introduces the two devices.
   apps for those.
 - **No internet relay.** kagami is LAN-first. For remote use, put it
   behind your VPN (it works over Tailscale out of the box).
+- **No AirPlay receiver (yet).** A design proposal for kagami acting as
+  an AirPlay receiver exists in `docs/airplay.md` — comparison of two
+  architectures, no implementation, nothing verified.
 - **Fullscreen on the TV view is not verified on real hardware yet.** It
   tries three fallbacks in order: `requestFullscreen()` (the standard
   path — expected to work on desktop and Android Chrome, not yet tested
