@@ -104,90 +104,11 @@ test("screen ending the session sends the sender back home with a clear message"
 	await senderCtx.close();
 });
 
-// Regresion de los dos fallos vistos en la LG real: la vista pantalla
-// metia scrollbar (webOS reporta vh incluyendo area oculta bajo su
-// barra), y los modos de ratio fijo recortaban contenido con
-// object-fit:cover en vez de deformar con fill. Cubre los requisitos de
-// test 1-4 del encargo para los 5 modos; lo que exige la tele real
-// (requisito 8, con capturas de 1280x800 y resolucion nativa) queda para
-// que Fran lo confirme delante del televisor.
-const OBJECT_FIT_BY_MODE: Record<string, string> = {
-	auto: "contain",
-	expanded: "cover",
-	"16:9": "fill",
-	"21:9": "fill",
-	"4:3": "fill",
-};
-
-test("all five aspect modes: no scrollbar, correct object-fit, no overlay bars", async ({
-	browser,
-}) => {
-	const screenCtx = await browser.newContext();
-	const senderCtx = await browser.newContext();
-	const screen = await screenCtx.newPage();
-	const sender = await senderCtx.newPage();
-
-	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
-	const code = (await screen.getByTestId("room-code").innerText()).trim();
-
-	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Share screen").click();
-	await expect(screen.getByTestId("video-wrapper")).not.toHaveClass(/hidden/, {
-		timeout: 15_000,
-	});
-
-	for (const [mode, expectedFit] of Object.entries(OBJECT_FIT_BY_MODE)) {
-		if (mode !== "auto") await sender.getByText(mode, { exact: true }).click();
-
-		// 1: cero scrollbar, en cualquier modo.
-		await expect
-			.poll(async () =>
-				screen.evaluate(() => {
-					const el = document.documentElement;
-					return (
-						el.scrollWidth === el.clientWidth &&
-						el.scrollHeight === el.clientHeight
-					);
-				}),
-			)
-			.toBe(true);
-
-		// 2/3: object-fit exacto por modo — "fill" en los ratios fijos, nunca
-		// "cover", es lo que garantiza que no se pierde contenido (requisito 2).
-		await expect
-			.poll(async () =>
-				screen.evaluate(() => document.querySelector("video")?.style.objectFit),
-			)
-			.toBe(expectedFit);
-
-		// 3: el rectangulo del <video> cae entero dentro del viewport.
-		const fitsInViewport = await screen.evaluate(() => {
-			const video = document.querySelector("video");
-			if (!video) return false;
-			const rect = video.getBoundingClientRect();
-			return (
-				rect.left >= -0.5 &&
-				rect.top >= -0.5 &&
-				rect.right <= window.innerWidth + 0.5 &&
-				rect.bottom <= window.innerHeight + 0.5
-			);
-		});
-		expect(fitsInViewport).toBe(true);
-
-		// 4: nada solapando el <video> — su caja no tiene mas hijos que el
-		// propio video, nunca un div de franja por encima.
-		const wrapperChildCount = await screen.evaluate(
-			() =>
-				document.querySelector('[data-testid="video-wrapper"]')?.children
-					.length,
-		);
-		expect(wrapperChildCount).toBe(1);
-	}
-
-	await screenCtx.close();
-	await senderCtx.close();
-});
+// Los cinco modos de aspecto (mirror) y las mismas reglas para el cast
+// tienen su propio fichero, screen-aspect.spec.ts: localizan el video por
+// visibilidad real, no por ser "el primero en el DOM" — ver ese fichero
+// para el porque exacto (fue un bug real de la propia prueba, no de la
+// app, encontrado al investigar un reporte de regresion falso).
 
 test("an unknown room code shows an error to the sender", async ({ page }) => {
 	await page.goto("/?code=ZZZZ");
