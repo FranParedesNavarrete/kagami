@@ -85,6 +85,13 @@ export function registerSignaling(
 				case "restart-ice":
 					if (code && role) rooms.relay(code, role, { type: "restart-ice" });
 					break;
+				case "set-aspect-mode":
+					if (code && role)
+						rooms.relay(code, role, {
+							type: "set-aspect-mode",
+							mode: msg.mode,
+						});
+					break;
 				case "leave":
 					if (code && role) rooms.leave(code, role);
 					code = null;

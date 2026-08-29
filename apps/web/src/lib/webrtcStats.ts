@@ -64,6 +64,13 @@ export interface OutboundVideoStats {
 	framesEncoded?: number;
 	qpSum?: number;
 	qualityLimitationReason?: string;
+	// totalPacketSendDelay (segundos acumulados) / packetsSent: el delta
+	// entre dos lecturas da el retraso medio de codificacion+envio por
+	// paquete. Es el numero que diagnostico el desfase de audio: 19ms a
+	// 2.5 Mbps/nativa, 83ms a 12 Mbps/nativa — codificar 5.9 Mpx/frame en
+	// software (libvpx) no da tiempo, no importa cuanto bitrate se permita.
+	totalPacketSendDelay?: number;
+	packetsSent?: number;
 }
 
 export async function getOutboundVideoStats(
@@ -82,8 +89,29 @@ export async function getOutboundVideoStats(
 				framesEncoded: stat.framesEncoded,
 				qpSum: stat.qpSum,
 				qualityLimitationReason: stat.qualityLimitationReason,
+				totalPacketSendDelay: stat.totalPacketSendDelay,
+				packetsSent: stat.packetsSent,
 			};
 		}
 	}
 	return result;
+}
+
+// El otro lado del ajuste adaptativo (lib/quality.ts capMaxBitrate): lo
+// que WebRTC estima que la red puede llevar de verdad ahora mismo, del
+// par de candidatos ICE nominado (el que esta realmente en uso).
+export async function getAvailableOutgoingBitrate(
+	pc: RTCPeerConnection,
+): Promise<number | null> {
+	const report = await pc.getStats();
+	for (const stat of report.values()) {
+		if (
+			stat.type === "candidate-pair" &&
+			stat.nominated &&
+			stat.state === "succeeded"
+		) {
+			return stat.availableOutgoingBitrate ?? null;
+		}
+	}
+	return null;
 }

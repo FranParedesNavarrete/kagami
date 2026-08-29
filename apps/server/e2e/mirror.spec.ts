@@ -104,6 +104,44 @@ test("screen ending the session sends the sender back home with a clear message"
 	await senderCtx.close();
 });
 
+test("the sender's aspect mode reaches the screen live, over WS, without reloading", async ({
+	browser,
+}) => {
+	const screenCtx = await browser.newContext();
+	const senderCtx = await browser.newContext();
+	const screen = await screenCtx.newPage();
+	const sender = await senderCtx.newPage();
+
+	await screen.goto("/");
+	await screen.getByText("Be the screen").click();
+	const code = (await screen.getByTestId("room-code").innerText()).trim();
+
+	await sender.goto(`/?code=${code}`);
+	await sender.getByText("Share screen").click();
+	await expect(screen.locator("video")).not.toHaveClass(/hidden/, {
+		timeout: 15_000,
+	});
+
+	// "cover" (expandido): sin caja de ratio, llena todo el viewport recortando.
+	await sender.getByText("cover", { exact: true }).click();
+	await expect
+		.poll(async () =>
+			screen.evaluate(() => document.querySelector("video")?.style.objectFit),
+		)
+		.toBe("cover");
+
+	// "16:9": min()/calc() puro CSS, sin tocar la conexion WebRTC.
+	await sender.getByText("16:9", { exact: true }).click();
+	await expect
+		.poll(async () =>
+			screen.evaluate(() => document.querySelector("video")?.style.width),
+		)
+		.toContain("min(100vw,");
+
+	await screenCtx.close();
+	await senderCtx.close();
+});
+
 test("an unknown room code shows an error to the sender", async ({ page }) => {
 	await page.goto("/?code=ZZZZ");
 	await expect(page.getByText(/doesn't exist or already expired/i)).toBeVisible(

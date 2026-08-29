@@ -3,6 +3,7 @@ import { DebugOverlay } from "../../components/DebugOverlay.js";
 import { QrCode } from "../../components/QrCode.js";
 import { useSignaling } from "../../hooks/useSignaling.js";
 import { useI18n } from "../../i18n/i18n.js";
+import { type AspectMode, videoStyleForAspect } from "../../lib/aspect.js";
 import {
 	type PeerSession,
 	RTC_CONFIG,
@@ -47,13 +48,40 @@ export function ScreenView() {
 	const { t } = useI18n();
 	const [state, setState] = useState<ScreenState>({ phase: "connecting" });
 	const [debugInfo, setDebugInfo] = useState<Record<string, string>>({});
+	const [aspectMode, setAspectMode] = useState<AspectMode>("auto");
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const sessionRef = useRef<PeerSession | null>(null);
 	const statsIntervalRef = useRef<number | null>(null);
+	const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
 	useEffect(() => {
 		if (status === "open") send({ type: "create-room" });
 	}, [status, send]);
+
+	// La tele se duerme sola: el salvapantallas de webOS no considera un
+	// video WebRTC "actividad". Screen Wake Lock API mientras hay video;
+	// si el navegador no la soporta (posible en webOS), no hay fallback
+	// por JS — hay que desactivar el salvapantallas en la propia tele
+	// (no es el modo eco). Ver docs/webrtc-quality.md.
+	useEffect(() => {
+		if (state.phase !== "sharing" || !("wakeLock" in navigator)) return;
+		let cancelled = false;
+		navigator.wakeLock
+			.request("screen")
+			.then((lock) => {
+				if (cancelled) {
+					lock.release().catch(() => {});
+					return;
+				}
+				wakeLockRef.current = lock;
+			})
+			.catch((err) => console.warn("wake lock request failed", err));
+		return () => {
+			cancelled = true;
+			wakeLockRef.current?.release().catch(() => {});
+			wakeLockRef.current = null;
+		};
+	}, [state.phase]);
 
 	const stopStatsWatcher = useCallback(() => {
 		if (statsIntervalRef.current !== null) {
@@ -176,6 +204,10 @@ export function ScreenView() {
 						sessionRef.current?.addRemoteIce(msg.candidate);
 						break;
 
+					case "set-aspect-mode":
+						setAspectMode(msg.mode);
+						break;
+
 					case "peer-left":
 						stopStatsWatcher();
 						sessionRef.current?.pc.close();
@@ -202,10 +234,11 @@ export function ScreenView() {
 				ref={videoRef}
 				autoPlay
 				playsInline
-				className={
+				className={state.phase === "sharing" ? undefined : "hidden"}
+				style={
 					state.phase === "sharing"
-						? "h-screen w-screen object-contain"
-						: "hidden"
+						? videoStyleForAspect(aspectMode)
+						: undefined
 				}
 			/>
 

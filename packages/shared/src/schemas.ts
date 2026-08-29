@@ -27,6 +27,18 @@ const iceCandidateSchema = z.object({
 	usernameFragment: z.string().nullable().optional(),
 });
 
+// Modo de aspecto de la vista pantalla — el control vive en el emisor
+// (el mando de la tele es incomodo) y viaja por WS. Puro CSS en el
+// receptor, nunca toca la conexion WebRTC.
+export const AspectModeSchema = z.enum([
+	"auto",
+	"cover",
+	"16:9",
+	"21:9",
+	"4:3",
+]);
+export type AspectMode = z.infer<typeof AspectModeSchema>;
+
 // Mensajes cliente -> server. Un mensaje que no valida se rechaza con log,
 // nunca se procesa "a ver si cuela" (CODESTYLE.md §2).
 export const ClientMessageSchema = z.discriminatedUnion("type", [
@@ -37,6 +49,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("ice"), candidate: iceCandidateSchema }),
 	z.object({ type: z.literal("leave") }),
 	z.object({ type: z.literal("restart-ice") }),
+	z.object({ type: z.literal("set-aspect-mode"), mode: AspectModeSchema }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
@@ -54,6 +67,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("ice"), candidate: iceCandidateSchema }),
 	z.object({ type: z.literal("peer-left") }),
 	z.object({ type: z.literal("restart-ice") }),
+	z.object({ type: z.literal("set-aspect-mode"), mode: AspectModeSchema }),
 	z.object({
 		type: z.literal("error"),
 		code: z.enum([

@@ -48,6 +48,17 @@ describe("ClientMessageSchema", () => {
 			true,
 		);
 	});
+
+	it("accepts set-aspect-mode with a valid mode, rejects an unknown one", () => {
+		expect(
+			ClientMessageSchema.safeParse({ type: "set-aspect-mode", mode: "16:9" })
+				.success,
+		).toBe(true);
+		expect(
+			ClientMessageSchema.safeParse({ type: "set-aspect-mode", mode: "32:9" })
+				.success,
+		).toBe(false);
+	});
 });
 
 describe("ServerMessageSchema", () => {
@@ -82,5 +93,12 @@ describe("ServerMessageSchema", () => {
 		expect(ServerMessageSchema.safeParse({ type: "restart-ice" }).success).toBe(
 			true,
 		);
+	});
+
+	it("accepts set-aspect-mode with a valid mode", () => {
+		expect(
+			ServerMessageSchema.safeParse({ type: "set-aspect-mode", mode: "cover" })
+				.success,
+		).toBe(true);
 	});
 });

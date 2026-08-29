@@ -1,9 +1,25 @@
-import type { ServerMessage } from "@kagami/shared";
+import type { AspectMode, ServerMessage } from "@kagami/shared";
 import { Mic, MicOff, MonitorUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSignaling } from "../../hooks/useSignaling.js";
 import { type I18nKey, useI18n } from "../../i18n/i18n.js";
-import { canMirror, isIOS } from "../../lib/capabilities.js";
+import {
+	ASPECT_MODES,
+	loadAspectMode,
+	saveAspectMode,
+} from "../../lib/aspect.js";
+import {
+	type AudioSource,
+	captureMedia,
+	listAudioInputDevices,
+	loadAudioDeviceId,
+	loadAudioSource,
+	saveAudioDeviceId,
+	saveAudioSource,
+	supportsSystemAudioCapture,
+} from "../../lib/audioSource.js";
+import { isBrave, isChrome, isSafari } from "../../lib/browserDetect.js";
+import { canMirror } from "../../lib/capabilities.js";
 import {
 	type CodecPreference,
 	UnsupportedCodecError,
@@ -15,9 +31,18 @@ import {
 	QUALITY_PRESETS,
 	type QualityPreset,
 	applyQualityToSender,
+	capMaxBitrate,
 	loadQualityPreset,
 	saveQualityPreset,
 } from "../../lib/quality.js";
+import {
+	DEFAULT_RESOLUTION,
+	RESOLUTION_PRESETS,
+	type ResolutionPreset,
+	computeScaleResolutionDownBy,
+	loadResolutionPreset,
+	saveResolutionPreset,
+} from "../../lib/resolution.js";
 import {
 	type PeerSession,
 	RTC_CONFIG,
@@ -25,6 +50,7 @@ import {
 	iceCandidateToMessage,
 } from "../../lib/webrtc.js";
 import {
+	getAvailableOutgoingBitrate,
 	getNegotiatedVideoCodec,
 	getOutboundVideoStats,
 } from "../../lib/webrtcStats.js";
@@ -41,18 +67,24 @@ interface LiveStats {
 	codec: string | null;
 	resolution: string | null;
 	fps: number | null;
+	sourceFps: number | null;
 	kbps: number | null;
+	availableKbps: number | null;
 	avgQp: number | null;
 	limitationReason: string | null;
+	avgPacketDelayMs: number | null;
 }
 
 const EMPTY_STATS: LiveStats = {
 	codec: null,
 	resolution: null,
 	fps: null,
+	sourceFps: null,
 	kbps: null,
+	availableKbps: null,
 	avgQp: null,
 	limitationReason: null,
+	avgPacketDelayMs: null,
 };
 
 function joinErrorKey(code: string): I18nKey {
@@ -72,8 +104,18 @@ export function SenderView({ initialCode, onExit }: Props) {
 	const { t } = useI18n();
 	const [state, setState] = useState<SenderState>({ phase: "joining" });
 	const [quality, setQuality] = useState<QualityPreset>(loadQualityPreset);
+	const [resolutionPreset, setResolutionPreset] =
+		useState<ResolutionPreset>(loadResolutionPreset);
 	const [codecPref, setCodecPref] =
 		useState<CodecPreference>(loadCodecPreference);
+	const [contentHint, setContentHint] = useState<"detail" | "motion">("detail");
+	const [audioSource, setAudioSource] = useState<AudioSource>(loadAudioSource);
+	const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+	const [audioDeviceId, setAudioDeviceId] = useState<string | null>(
+		loadAudioDeviceId,
+	);
+	const [aspectMode, setAspectMode] = useState<AspectMode>(loadAspectMode);
+	const [braveDetected, setBraveDetected] = useState(false);
 	const [stats, setStats] = useState<LiveStats>(EMPTY_STATS);
 	const sessionRef = useRef<PeerSession | null>(null);
 	const streamRef = useRef<MediaStream | null>(null);
@@ -85,6 +127,17 @@ export function SenderView({ initialCode, onExit }: Props) {
 			send({ type: "join-room", code: initialCode });
 		}
 	}, [status, send, initialCode]);
+
+	useEffect(() => {
+		isBrave().then(setBraveDetected);
+	}, []);
+
+	useEffect(() => {
+		if (audioSource !== "input-device") return;
+		listAudioInputDevices()
+			.then(setAudioDevices)
+			.catch((err) => console.warn("enumerateDevices failed", err));
+	}, [audioSource]);
 
 	// startPeerConnection NO vuelve a pedir getDisplayMedia: reutiliza el
 	// stream ya capturado, tanto al empezar como en un restart-ice. Puede
@@ -107,9 +160,21 @@ export function SenderView({ initialCode, onExit }: Props) {
 						streams: [stream],
 					});
 					applyCodecPreferences(transceiver, codecPref);
-					await applyQualityToSender(transceiver.sender, quality).catch((err) =>
-						console.warn("setParameters failed", err),
+					// scaleResolutionDownBy se calcula a partir de la resolucion
+					// REAL capturada, no un valor fijo (sprint de calidad): un Mac
+					// con Retina y uno sin Retina necesitan factores distintos
+					// para llegar al mismo 1080p. Se fija aqui y no vuelve a
+					// tocarse en mitad de stream.
+					const capturedWidth = track.getSettings().width ?? 1920;
+					const scaleDownBy = computeScaleResolutionDownBy(
+						resolutionPreset,
+						capturedWidth,
 					);
+					await applyQualityToSender(
+						transceiver.sender,
+						quality,
+						scaleDownBy,
+					).catch((err) => console.warn("setParameters failed", err));
 				} else {
 					pc.addTrack(track, stream);
 				}
@@ -119,7 +184,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 			await pc.setLocalDescription(offer);
 			send({ type: "offer", sdp: offer as { type: "offer"; sdp: string } });
 		},
-		[send, quality, codecPref],
+		[send, quality, codecPref, resolutionPreset],
 	);
 
 	useEffect(
@@ -170,25 +235,33 @@ export function SenderView({ initialCode, onExit }: Props) {
 	);
 
 	// Diagnostico SIEMPRE visible mientras comparte (no solo con
-	// ?debug=1): codec, resolucion, fps, bitrate real y QP medio. Son
-	// justo los campos que diagnosticaron el hallazgo real — Chrome/Brave
-	// negociando VP9 en negro (docs/webrtc-codec.md) y el techo de
-	// bitrate por defecto emborronando el movimiento sin que fuera la
-	// red ni la CPU (docs/webrtc-quality.md). No queremos volver a
-	// depurar ninguno de los dos a ciegas.
+	// ?debug=1): codec, resolucion, fps de origen vs enviados, bitrate
+	// real, techo disponible, QP medio, motivo de limitacion y retraso de
+	// codificacion+envio. Son justo los campos que diagnosticaron los dos
+	// hallazgos reales: Chrome/Brave negociando VP9 en negro
+	// (docs/webrtc-codec.md) y que el coste es de RESOLUCION, no de
+	// bitrate (docs/webrtc-quality.md) — no queremos volver a depurar
+	// ninguno de los dos a ciegas.
+	//
+	// Este mismo intervalo hace el ajuste adaptativo del requisito 2: el
+	// bitrate nunca debe superar availableOutgoingBitrate. Los presets de
+	// calidad son un TECHO deseado, no un valor fijo.
 	useEffect(() => {
 		if (state.phase !== "sharing") return;
 		let lastBytes = 0;
 		let lastQpSum = 0;
 		let lastFramesEncoded = 0;
+		let lastDelay = 0;
+		let lastPacketsSent = 0;
 		let lastTime = performance.now();
 
 		const interval = setInterval(async () => {
 			const pc = sessionRef.current?.pc;
 			if (!pc) return;
-			const [codec, outbound] = await Promise.all([
+			const [codec, outbound, availableBps] = await Promise.all([
 				getNegotiatedVideoCodec(pc, "outbound-rtp"),
 				getOutboundVideoStats(pc),
+				getAvailableOutgoingBitrate(pc),
 			]);
 			if (!outbound) return;
 
@@ -212,8 +285,35 @@ export function SenderView({ initialCode, onExit }: Props) {
 				lastFramesEncoded = outbound.framesEncoded;
 			}
 
+			let avgPacketDelayMs: number | null = null;
+			if (
+				outbound.totalPacketSendDelay !== undefined &&
+				outbound.packetsSent !== undefined
+			) {
+				const deltaDelay = outbound.totalPacketSendDelay - lastDelay;
+				const deltaPackets = outbound.packetsSent - lastPacketsSent;
+				if (deltaPackets > 0)
+					avgPacketDelayMs =
+						Math.round(((deltaDelay / deltaPackets) * 1000 * 10) / 1) / 10;
+				lastDelay = outbound.totalPacketSendDelay;
+				lastPacketsSent = outbound.packetsSent;
+			}
+
 			lastBytes = outbound.bytesSent;
 			lastTime = now;
+
+			const videoSender = pc
+				.getSenders()
+				.find((s) => s.track?.kind === "video");
+			if (videoSender && availableBps !== null) {
+				const cap = Math.min(
+					quality.maxBitrate,
+					Math.round(availableBps * 0.85),
+				);
+				capMaxBitrate(videoSender, cap).catch((err) =>
+					console.warn("capMaxBitrate failed", err),
+				);
+			}
 
 			setStats((prev) => ({
 				codec: codec ?? prev.codec,
@@ -222,39 +322,64 @@ export function SenderView({ initialCode, onExit }: Props) {
 						? `${outbound.frameWidth}x${outbound.frameHeight}`
 						: prev.resolution,
 				fps: outbound.framesPerSecond ?? prev.fps,
+				sourceFps: prev.sourceFps,
 				kbps: kbps ?? prev.kbps,
+				availableKbps:
+					availableBps !== null
+						? Math.round(availableBps / 1000)
+						: prev.availableKbps,
 				avgQp: avgQp ?? prev.avgQp,
 				limitationReason:
 					outbound.qualityLimitationReason ?? prev.limitationReason,
+				avgPacketDelayMs: avgPacketDelayMs ?? prev.avgPacketDelayMs,
 			}));
 		}, 1000);
 		return () => clearInterval(interval);
-	}, [state.phase]);
+	}, [state.phase, quality]);
 
 	async function shareScreen() {
 		try {
-			const stream = await navigator.mediaDevices.getDisplayMedia({
-				// Sin width/height: medido en real que la resolucion nativa
-				// (Retina incluida) va bien de CPU y de red — el problema no
-				// era la resolucion, era el techo de bitrate por defecto de
-				// Chrome (ver docs/webrtc-quality.md). frameRate si se pide,
-				// como numero llano (Chromium rechaza `exact` con TypeError).
-				video: { frameRate: 30 },
-				audio: true,
-			});
+			const videoConstraints: MediaTrackConstraints = { frameRate: 30 };
+			if (isSafari()) {
+				// Intento best-effort de pedir resolucion nativa Retina: Safari
+				// captura la pantalla a puntos logicos por defecto (mitad de
+				// resolucion en una pantalla Retina), sin garantia de que honre
+				// esto. Ver docs/webrtc-quality.md.
+				videoConstraints.width = {
+					ideal: window.screen.width * window.devicePixelRatio,
+				};
+				videoConstraints.height = {
+					ideal: window.screen.height * window.devicePixelRatio,
+				};
+			}
+
+			const { stream, hasAudio } = await captureMedia(
+				videoConstraints,
+				audioSource,
+				audioDeviceId,
+			);
 			streamRef.current = stream;
 
 			const videoTrack = stream.getVideoTracks()[0];
 			if (!videoTrack) throw new Error("no video track in captured stream");
+			videoTrack.contentHint = contentHint;
 			videoTrack.onended = () => stopSharing();
 
-			setStats(EMPTY_STATS);
+			const sourceFrameRate = videoTrack.getSettings().frameRate;
+			setStats({
+				...EMPTY_STATS,
+				sourceFps: sourceFrameRate ? Math.round(sourceFrameRate) : null,
+			});
+
 			await startPeerConnection(stream);
+			// La pantalla no tiene forma de saber el modo de aspecto elegido
+			// si no se lo decimos en cuanto arranca.
+			send({ type: "set-aspect-mode", mode: aspectMode });
 
 			setState({
 				phase: "sharing",
 				label: videoTrack.label || "screen",
-				hasAudio: stream.getAudioTracks().length > 0,
+				hasAudio,
 			});
 		} catch (err) {
 			for (const track of streamRef.current?.getTracks() ?? []) track.stop();
@@ -290,6 +415,24 @@ export function SenderView({ initialCode, onExit }: Props) {
 		setState({ phase: "session-ended", reason: "self-stopped" });
 	}
 
+	function changeAspectMode(mode: AspectMode) {
+		setAspectMode(mode);
+		saveAspectMode(mode);
+		send({ type: "set-aspect-mode", mode });
+	}
+
+	const chromeH264Warning =
+		state.phase !== "joining" &&
+		codecPref === "h264" &&
+		isChrome() &&
+		!braveDetected;
+	const bitrateExceedsAvailable =
+		stats.kbps !== null &&
+		stats.availableKbps !== null &&
+		stats.kbps > stats.availableKbps;
+	const highPacketDelay =
+		stats.avgPacketDelayMs !== null && stats.avgPacketDelayMs > 20;
+
 	return (
 		<div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-6 text-center text-white">
 			{state.phase === "joining" && (
@@ -305,6 +448,17 @@ export function SenderView({ initialCode, onExit }: Props) {
 
 			{state.phase === "ready" && (
 				<>
+					{braveDetected && (
+						<p className="max-w-md text-sm text-yellow-400">
+							{t("sender.braveWarning")}
+						</p>
+					)}
+					{isSafari() && (
+						<p className="max-w-md text-sm text-white/50">
+							{t("sender.safariNote")}
+						</p>
+					)}
+
 					<div className="flex flex-col items-center gap-2">
 						<span className="text-sm text-white/60">
 							{t("sender.codecPreference")}
@@ -328,7 +482,38 @@ export function SenderView({ initialCode, onExit }: Props) {
 								</button>
 							))}
 						</div>
+						{chromeH264Warning && (
+							<p className="max-w-md text-sm text-yellow-400">
+								{t("sender.chromeH264Warning")}
+							</p>
+						)}
 					</div>
+
+					<div className="flex flex-col items-center gap-2">
+						<span className="text-sm text-white/60">
+							{t("sender.resolution")}
+						</span>
+						<div className="flex gap-2">
+							{RESOLUTION_PRESETS.map((preset) => (
+								<button
+									key={preset.id}
+									type="button"
+									onClick={() => {
+										setResolutionPreset(preset);
+										saveResolutionPreset(preset);
+									}}
+									className={
+										preset.id === resolutionPreset.id
+											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+									}
+								>
+									{preset.label}
+								</button>
+							))}
+						</div>
+					</div>
+
 					<div className="flex flex-col items-center gap-2">
 						<span className="text-sm text-white/60">{t("sender.quality")}</span>
 						<div className="flex gap-2">
@@ -351,6 +536,105 @@ export function SenderView({ initialCode, onExit }: Props) {
 							))}
 						</div>
 					</div>
+
+					<div className="flex flex-col items-center gap-2">
+						<span className="text-sm text-white/60">
+							{t("sender.contentHint")}
+						</span>
+						<div className="flex gap-2">
+							{(["detail", "motion"] as const).map((hint) => (
+								<button
+									key={hint}
+									type="button"
+									onClick={() => setContentHint(hint)}
+									className={
+										hint === contentHint
+											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold uppercase"
+											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm uppercase text-white/70"
+									}
+								>
+									{hint}
+								</button>
+							))}
+						</div>
+					</div>
+
+					<div className="flex flex-col items-center gap-2">
+						<span className="text-sm text-white/60">
+							{t("sender.audioSource")}
+						</span>
+						<div className="flex gap-2">
+							{supportsSystemAudioCapture() && (
+								<button
+									type="button"
+									onClick={() => {
+										setAudioSource("system");
+										saveAudioSource("system");
+									}}
+									className={
+										audioSource === "system"
+											? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+											: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+									}
+								>
+									{t("sender.audioSourceSystem")}
+								</button>
+							)}
+							<button
+								type="button"
+								onClick={() => {
+									setAudioSource("input-device");
+									saveAudioSource("input-device");
+								}}
+								className={
+									audioSource === "input-device"
+										? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+										: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+								}
+							>
+								{t("sender.audioSourceDevice")}
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setAudioSource("none");
+									saveAudioSource("none");
+								}}
+								className={
+									audioSource === "none"
+										? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold"
+										: "rounded-lg bg-neutral-800 px-4 py-2 text-sm text-white/70"
+								}
+							>
+								{t("sender.audioSourceNone")}
+							</button>
+						</div>
+						{!supportsSystemAudioCapture() && (
+							<p className="max-w-md text-xs text-white/40">
+								{t("sender.audioSourceHint")}
+							</p>
+						)}
+						{audioSource === "input-device" && (
+							<select
+								value={audioDeviceId ?? ""}
+								onChange={(e) => {
+									setAudioDeviceId(e.target.value);
+									saveAudioDeviceId(e.target.value);
+								}}
+								className="rounded-lg bg-neutral-800 px-3 py-2 text-sm text-white"
+							>
+								<option value="" disabled>
+									{t("sender.audioDevicePick")}
+								</option>
+								{audioDevices.map((device) => (
+									<option key={device.deviceId} value={device.deviceId}>
+										{device.label || device.deviceId.slice(0, 8)}
+									</option>
+								))}
+							</select>
+						)}
+					</div>
+
 					<button
 						type="button"
 						onClick={shareScreen}
@@ -377,15 +661,58 @@ export function SenderView({ initialCode, onExit }: Props) {
 							? t("sender.codecLabel", { codec: stats.codec })
 							: t("sender.codecPending")}
 						{stats.resolution ? ` · ${stats.resolution}` : ""}
-						{stats.fps !== null ? ` · ${stats.fps}fps` : ""}
+						{stats.sourceFps !== null && stats.fps !== null
+							? ` · ${stats.sourceFps}→${stats.fps}fps`
+							: stats.fps !== null
+								? ` · ${stats.fps}fps`
+								: ""}
 						{stats.kbps !== null
 							? ` · ${(stats.kbps / 1000).toFixed(1)}Mbps`
+							: ""}
+						{stats.availableKbps !== null
+							? ` (avail ${(stats.availableKbps / 1000).toFixed(1)})`
 							: ""}
 						{stats.avgQp !== null ? ` · QP ${stats.avgQp}` : ""}
 						{stats.limitationReason
 							? ` · limit: ${stats.limitationReason}`
 							: ""}
 					</p>
+					{stats.avgPacketDelayMs !== null && (
+						<p
+							className={`text-sm ${highPacketDelay ? "text-red-400" : "text-white/40"}`}
+						>
+							encode+send delay: {stats.avgPacketDelayMs}ms
+							{highPacketDelay ? ` — ${t("sender.highDelayWarning")}` : ""}
+						</p>
+					)}
+					{bitrateExceedsAvailable && (
+						<p className="text-sm text-red-400">
+							{t("sender.bitrateExceedsWarning")}
+						</p>
+					)}
+
+					<div className="flex flex-col items-center gap-2">
+						<span className="text-sm text-white/60">
+							{t("sender.aspectMode")}
+						</span>
+						<div className="flex flex-wrap justify-center gap-2">
+							{ASPECT_MODES.map((mode) => (
+								<button
+									key={mode}
+									type="button"
+									onClick={() => changeAspectMode(mode)}
+									className={
+										mode === aspectMode
+											? "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold"
+											: "rounded-lg bg-neutral-800 px-3 py-2 text-sm text-white/70"
+									}
+								>
+									{mode}
+								</button>
+							))}
+						</div>
+					</div>
+
 					<button
 						type="button"
 						onClick={stopSharing}

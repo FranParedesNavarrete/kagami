@@ -1,11 +1,15 @@
 // Escalones de BITRATE, elegibles desde la UI del emisor sin recompilar
-// ni redesplegar. Medido en real (Chrome, pantalla completa, 4.5 min,
-// ver docs/webrtc-quality.md): Chrome topa el bitrate de screenshare en
-// ~2.5 Mbps por defecto — con availableOutgoingBitrate en 5.65 Mbps sin
-// usar, encoder con margen de sobra y 0 paquetes perdidos. No es limite
-// de red ni de CPU, es un techo por defecto que se puede subir a mano.
-// La resolucion NO se downscalea aqui: la nativa (Retina incluida)
-// funciono bien en esa misma corrida; el problema era solo el bitrate.
+// ni redesplegar. Son un TECHO deseado, no un valor fijo: el emisor los
+// recorta en vivo a como mucho ~85% de availableOutgoingBitrate (ver
+// capMaxBitrate) para no mandar mas de lo que la red puede llevar de
+// verdad. Medido en real (Chrome, pantalla completa, 4.5 min, ver
+// docs/webrtc-quality.md): Chrome topa el bitrate de screenshare en
+// ~2.5 Mbps por defecto sin que sea limite de red ni de CPU.
+//
+// La causa raiz real, medida despues, no era el bitrate sino la
+// RESOLUCION (docs/webrtc-quality.md, sesion de calidad/latencia): la
+// codificacion es por software y su coste escala con pixeles. La
+// resolucion se fija aparte, ver lib/resolution.ts.
 export interface QualityPreset {
 	id: string;
 	label: string;
@@ -34,10 +38,10 @@ const Q_12M: QualityPreset = {
 };
 
 export const QUALITY_PRESETS: QualityPreset[] = [Q_2_5M, Q_5M, Q_8M, Q_12M];
-// 8 Mbps de partida en LAN (ver docs/webrtc-quality.md): sobra margen de
-// red y de CPU medido en la corrida de referencia, así que el punto de
-// partida para encontrar el techo de la tele es alto, no conservador.
-export const DEFAULT_QUALITY = Q_8M;
+// 5 Mbps por defecto: a 1080p (la resolucion por defecto, ver
+// lib/resolution.ts) sobra de sobra y no satura — 8/12 Mbps solo tenian
+// sentido como techo cuando se pensaba que el bitrate era la causa raiz.
+export const DEFAULT_QUALITY = Q_5M;
 
 const STORAGE_KEY = "kagami-quality";
 
@@ -58,13 +62,18 @@ export function saveQualityPreset(preset: QualityPreset): void {
 	}
 }
 
-// maxBitrate ANTES de que el sender empiece a negociar. scaleResolutionDownBy:1
-// + degradationPreference "maintain-resolution" evitan que el encoder
-// cambie de resolucion a mitad de stream (docs/webrtc-quality.md) — con
-// bitrate de sobra, ese modo ya no cuesta framerate como pasaba a 2.5 Mbps.
+// maxBitrate y scaleResolutionDownBy ANTES de que el sender empiece a
+// negociar. scaleResolutionDownBy se calcula fuera (lib/resolution.ts) a
+// partir de la resolucion REAL capturada, nunca un valor fijo — un Mac
+// sin Retina y uno con Retina necesitan factores de escala distintos
+// para llegar al mismo 1080p. degradationPreference "maintain-resolution"
+// evita que el encoder cambie de resolucion a mitad de stream
+// (docs/webrtc-quality.md): con bitrate y resolucion ya ajustados, ese
+// modo no debería costar framerate como pasaba a 2.5 Mbps/nativa.
 export async function applyQualityToSender(
 	sender: RTCRtpSender,
 	preset: QualityPreset,
+	scaleResolutionDownBy: number,
 ): Promise<void> {
 	const params = sender.getParameters();
 	if (!params.encodings || params.encodings.length === 0)
@@ -72,8 +81,24 @@ export async function applyQualityToSender(
 	const encoding = params.encodings[0];
 	if (encoding) {
 		encoding.maxBitrate = preset.maxBitrate;
-		encoding.scaleResolutionDownBy = 1;
+		encoding.scaleResolutionDownBy = scaleResolutionDownBy;
 	}
 	params.degradationPreference = "maintain-resolution";
+	await sender.setParameters(params);
+}
+
+// Ajuste adaptativo en vivo (requisito 2 del sprint de calidad): el
+// bitrate efectivo nunca debe superar availableOutgoingBitrate. Solo
+// toca maxBitrate — resolucion y degradationPreference no se tocan
+// nunca a mitad de stream. No llama a setParameters si el valor no
+// cambia, para no generar renegociacion de mas cada segundo.
+export async function capMaxBitrate(
+	sender: RTCRtpSender,
+	capBps: number,
+): Promise<void> {
+	const params = sender.getParameters();
+	const encoding = params.encodings?.[0];
+	if (!encoding || encoding.maxBitrate === capBps) return;
+	encoding.maxBitrate = capBps;
 	await sender.setParameters(params);
 }
