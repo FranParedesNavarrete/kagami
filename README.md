@@ -19,7 +19,7 @@ Self-hosted. No cables, no store apps, no accounts.
      La tele mostrando el codigo de sala grande y el QR.
      Preferible FOTO del salon a captura de pantalla: vende mucho mas.
      ══════════════════════════════════════════════════════════════════ -->
-<!-- <img src="docs/media/hero.png" alt="A TV showing a kagami room code" width="100%"> -->
+<img src="docs/media/hero.png" alt="A TV showing a kagami room code" width="100%">
 
 <br>
 
