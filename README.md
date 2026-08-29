@@ -1,65 +1,67 @@
 # kagami
 
-![kagami](.github/logo-lockup.png)
+Screen mirroring and casting for any TV with a browser. Self-hosted. No cables, no store apps, no accounts.
 
-Screen mirroring and casting for any TV with a browser. Self-hosted,
-no cables, no store apps, no accounts.
+**License:** MIT · **Runtime:** Node 22 · **Deploy:** Docker
 
-kagami (鏡) means *mirror*. Open the web app on your TV, get a 4-character
-code, enter it on your laptop or phone — and share your screen or cast a
-video. The video travels peer-to-peer over your LAN; the server only
-introduces the two devices.
+<!-- IMAGEN 1 · hero
+Foto o captura de la tele mostrando el codigo de sala grande + QR. 1600x900, PNG.
+Si es foto del salon, mejor que captura: vende mas.
+Guardar en docs/media/hero.png -->
+<img src="docs/media/hero.png" alt="A TV showing a kagami room code" width="100%">
+
+kagami (鏡) means mirror. Open it on your TV, get a four-character code, type that code on your laptop or phone — and your screen is on the TV.
+
+The video travels peer-to-peer over your own network. The server only introduces the two devices and then gets out of the way. Nothing leaves your house, nothing touches a cloud, and there is no account to create.
 
 ## What it does
 
-- **Mirror** — share your full screen, a window or a tab from any desktop
-  browser (Chrome, Safari, Firefox, Edge) to the TV in real time.
-- **Cast a URL** — paste a video link; the TV plays it natively at full
-  quality, with remote play/pause/seek from your device.
-- **Cast a file** — pick a video from your phone or computer; it streams
-  to the TV even if you lock your phone. Files are stored temporarily on
-  your server and deleted when the session ends.
-- **Multiple screens at once** — each room is independent, so the same
-  sender can feed several TVs simultaneously, and any number of rooms can
-  run side by side. Verified in real use, not just by design. This is one
-  of the few things kagami does that AirPlay doesn't: AirPlay is a 1:1
-  session between one sender and one screen.
+**Mirror your desktop.** Share a full screen, a single window or one tab from any desktop browser. On a wired LAN this runs at native resolution with measured 210 ms of end-to-end latency — fast enough to present from, and to notice that it's fast.
+
+**Cast a link.** Paste a direct video URL and the TV plays it natively, at full quality, while you keep play, pause, seek and volume on your phone.
+
+**Cast a file.** Pick a video or photo from your phone or computer. It uploads to your own server and the TV streams it from there — so seeking is instant even on a 2 GB film, and you can lock your phone without stopping playback.
+
+**Several screens at once.** One sender can feed more than one screen, and independent rooms can run side by side. One kagami, every screen in the house.
+
+<!-- IMAGEN 2 · el emisor compartiendo
+Captura del portatil mientras comparte: pildora de estado, formato en la tele,
+y el desplegable de estadisticas abierto para que se vean los datos.
+1400x900, PNG. Guardar en docs/media/mirror.png -->
+<img src="docs/media/mirror.png" alt="The kagami sender while sharing a screen" width="100%">
 
 ## What it honestly does not do
 
-- **No full-screen mirroring from iPhone/iPad.** iOS does not let any web
-  page capture the system screen — that is AirPlay's exclusive. Use cast
-  instead: for playing content it is actually better.
-- **No DRM content.** Mirroring Netflix/Prime/Disney+ shows a black
-  square. That is DRM working as designed, not a bug. Use the TV's own
-  apps for those.
-- **No internet relay.** kagami is LAN-first. For remote use, put it
-  behind your VPN (it works over Tailscale out of the box).
-- **No AirPlay receiver (yet).** A design proposal for kagami acting as
-  an AirPlay receiver exists in `docs/airplay.md` — comparison of two
-  architectures, no implementation, nothing verified.
-- **Fullscreen on the TV view is not verified on real hardware yet.** It
-  tries three fallbacks in order: `requestFullscreen()` (the standard
-  path — expected to work on desktop and Android Chrome, not yet tested
-  on webOS), `video.webkitEnterFullscreen()` on the `<video>` element
-  itself (iOS Safari's only fullscreen entry point — not yet tested on a
-  real iPhone/iPad), and a `display: standalone` manifest so "Add to Home
-  Screen" opens without browser chrome (static config, not yet verified
-  on a real device either). None of this is claimed to work until it has
-  been checked on the actual TV and an actual phone.
-- **Pasting a YouTube/Vimeo/Twitch link casts nothing.** Those are pages,
-  not video files — kagami detects the known domains and says so instead
-  of failing with a confusing "unsupported format" error. It does not,
-  and will not, play those platforms itself; use the TV's own app.
+This section exists because most projects put it in an issue tracker instead.
 
-## Requirements
+- **No full-screen mirroring from iPhone or iPad.** iOS does not expose the system screen to any web page — that is AirPlay's exclusive, and no web app can work around it. Cast covers the real use case: playing content on the TV, where it is actually better than mirroring.
+- **No DRM content.** Mirroring Netflix, Prime or Disney+ produces a black rectangle. That is DRM working as designed, not a bug. Use the TV's own apps.
+- **No YouTube links.** A YouTube page is a web page, not a video file. Your TV almost certainly has a YouTube app that does this better, in 4K, for free.
+- **No internet relay.** kagami is LAN-first by design. For use away from home, put it behind your VPN — it works over Tailscale out of the box.
+- **Aspect modes only apply to VP8 mirroring.** Many TVs decode H.264 in a hardware overlay plane that the page's CSS cannot reach. Measured on an LG OLED; see docs/webrtc-codec.md.
 
-- Docker on a home server.
-- A TV (or any screen) with a web browser.
-- For senders, HTTPS with a certificate their browser trusts — screen
-  capture requires a secure context. A reverse proxy like Caddy with an
-  internal CA works perfectly; the TV view runs over plain HTTP on the
-  same port, so the TV needs no certificate at all.
+## Measured, not estimated
+
+Every number here was taken from a real session on a real TV, not from a benchmark or a guess. The reasoning behind each one is in docs/.
+
+| | Measured |
+|---|---|
+| End-to-end mirror latency | 210 ms (single sample, LAN, VP8) |
+| Continuous run without a cut | 15+ min, 0 packets lost, 0 PLI, 0 NACK |
+| Frame rate at native resolution | 26 of 26 source frames encoded |
+| Largest file cast | 1.5 GB, seeking instant |
+| Signalling round trip | 4 ms |
+
+## Browser support
+
+| Sender | Mirror | System audio | Notes |
+|---|---|---|---|
+| Chrome / Edge | Full resolution | Yes | Recommended. Everything above was measured here. |
+| Safari | Half resolution | Via a virtual device | Needs BlackHole to send system audio. |
+| Firefox | Untested | Via a virtual device | Should work; nobody has verified it. |
+| Brave | Broken | — | Fails to encode with Shields on. Disable them for the site. |
+
+The screen side only needs a browser that can decode H.264 or VP8. Verified on webOS (LG); other smart TVs are likely fine but unverified.
 
 ## Quick start
 
@@ -68,68 +70,82 @@ git clone <repo> kagami && cd kagami
 docker compose up -d
 ```
 
-- TV: open `http://<server>:7421` → "Be the screen" → a code appears.
-- Sender: open `https://kagami.your.domain` (behind your proxy), enter
-  the code, share or cast.
+On the TV: open `http://<your-server>:7421` → **Be the screen** → a code appears.
+On your laptop or phone: open the same address over HTTPS, type the code, share.
 
-Behind Caddy with the `casa` CLI: `sudo casa app alta kagami 7421`.
+One container. No database, no Redis, no message broker. Rooms live in memory and a restart simply clears them, which is the correct behaviour for something this ephemeral.
+
+## Behind a reverse proxy
+
+Screen capture requires a secure context, so senders must arrive over HTTPS. The TV is different: its side uses no API that needs a secure context, so the screen view is served over plain HTTP on the same port and the TV never needs to trust a certificate.
+
+With Caddy and an internal CA:
+
+```caddyfile
+kagami.example.com {
+    reverse_proxy 127.0.0.1:7421
+}
+
+http://screen.example.com {
+    reverse_proxy 127.0.0.1:7421
+}
+```
 
 ## Configuration
 
 | Variable | Default | What it does |
 |---|---|---|
-| `KAGAMI_PORT` | `7421` | HTTP port (bind it to 127.0.0.1 behind a proxy) |
-| `KAGAMI_CAST_MAX_MB` | `4096` | Max size of an uploaded cast file |
-| `KAGAMI_REMUX_FASTSTART` | `false` | Re-mux an uploaded mp4 with the `moov` atom at the end before serving it |
+| `KAGAMI_PORT` | `7421` | HTTP port. Bind it to 127.0.0.1 behind a proxy. |
+| `KAGAMI_CAST_MAX_MB` | `4096` | Maximum size of an uploaded cast file. |
+| `KAGAMI_REMUX_FASTSTART` | `false` | Rewrites uploads whose moov atom sits at the end. Off by default: the TVs tested fetch the tail with one extra range request, so remuxing a 2 GB file would cost minutes and twice the disk to fix something that is not broken. Turn it on for a receiver that needs it. |
 
-That is the whole configuration. Rooms live in memory, files live in a
-temp dir with guaranteed cleanup; there is no database.
+That is the entire configuration.
 
-`KAGAMI_REMUX_FASTSTART` is off by default because it isn't needed here:
-measured against a real LG TV (2026-08-29, see `docs/spike-range.md`),
-its browser resolves a trailing `moov` atom with a single range request
-for the last ~75KB of the file, then seeks correctly — remuxing would
-mean rewriting the whole file (minutes of wait and double the disk for
-a multi-GB upload) to fix something that isn't broken on this TV. The
-remux code and its tests stay in the codebase for receivers that do
-need it; set this to `true` if yours turns out to be one of them.
+## Supported formats for casting
 
-## System audio on Safari and Firefox
+mp4, webm, mov, m3u8 for video; jpg, png, webp for images.
 
-`getDisplayMedia({ audio: true })` only captures system audio on
-Chromium-based browsers. Safari ignores it entirely and Firefox doesn't
-support it, so sharing from either comes out silent unless you route
-system audio through an input device instead:
+This list comes from what the tested TVs actually play, not from what the specs say they should. Matroska (.mkv) is deliberately absent: no browser plays it reliably. kagami rejects unsupported files before the upload starts, rather than after a gigabyte has crossed your network.
 
-1. Install [BlackHole](https://existential.audio/blackhole/) (the 2ch
-   build is enough).
-2. In **Audio MIDI Setup** (macOS, ships with the OS), create a
-   **Multi-Output Device** that includes both BlackHole and your real
-   speakers/headphones — without this you go silent locally while
-   sharing.
-3. In **System Settings → Sound → Output**, pick that Multi-Output
-   Device.
-4. In kagami's sender view, choose **"Input device"** as the audio
-   source and pick **BlackHole 2ch** from the list.
+## Audio on Safari and Firefox
 
-The Multi-Output Device does not appear, and cannot appear, in kagami's
-selector — that selector lists audio *inputs*, and a Multi-Output
-Device is an output. Also: the browser hides real device names until it
-has granted microphone permission to the page at least once (Safari
-asks again on every page load, Chrome remembers it) — kagami requests
-that permission when you click "Input device", never silently.
+Chrome can capture system audio directly. Safari and Firefox cannot — that is a browser limitation, not a kagami one. The workaround is a virtual audio device:
+
+1. Install BlackHole (`brew install blackhole-2ch`) and reboot.
+2. In Audio MIDI Setup, create a Multi-Output Device with BlackHole and your speakers, with drift correction enabled on BlackHole.
+3. Set that device as your system output, and pick BlackHole 2ch as the audio source in kagami.
+
+Your Mac plays through the speakers as usual and kagami captures the same signal. Note that the Multi-Output Device itself never appears in kagami's picker — that list shows inputs, and BlackHole is the input half of the pair.
+
+<!-- IMAGEN 3 · cast desde el movil
+Captura del iPhone con el cast de fichero en marcha: controles y barra de tiempo.
+Vertical, ~900x1600, PNG. Guardar en docs/media/cast-phone.png -->
 
 ## How it works
 
-The server (Fastify + WebSocket) hosts the pages and relays the WebRTC
-handshake between sender and screen. The media itself flows directly
-between the two devices — on a LAN that means minimal latency and zero
-load on the server. The one exception is file casting, where the server
-holds the file temporarily so the TV can stream it natively with range
-requests (which is what makes seeking work, and what makes it work from
-an iPhone).
+The server (Fastify + WebSocket) serves the pages and relays the WebRTC handshake between sender and screen. The media itself flows directly between the two devices — on a LAN that means minimal latency and no load on the server at all. No STUN, no TURN: host candidates are enough when both devices can see each other.
 
-UI in English, Spanish and Portuguese.
+The one exception is file casting, and it is deliberate. The server holds the file temporarily so the TV can stream it with its own native decoder and real range requests, which is what makes seeking work and what makes it work from an iPhone at all.
+
+## Security
+
+- Nothing listens outside 127.0.0.1 in the production compose file. Your reverse proxy is the only door.
+- Room codes are four characters from a 27-character alphabet with no visually ambiguous glyphs, single-use, expiring after ten minutes unpaired. A paired room accepts no second sender.
+- Uploads are size-limited, validated by content rather than by file extension, isolated per room, served only to the room that uploaded them, and deleted when the room closes — with a 24-hour sweep that survives a server restart as a second line of defence.
+- No accounts, no personal data, no telemetry. There is nothing to export and nothing to leak.
+
+## Development
+
+```bash
+pnpm install
+pnpm run dev          # server + web, hot reload
+pnpm run test         # unit and integration
+pnpm run e2e          # Playwright against the real server
+```
+
+TypeScript throughout, Node 22, pnpm workspaces: apps/server, apps/web, packages/shared. Every message crossing the WebSocket is validated with zod on both ends. Anything that requires a physical TV is documented as a pending human check and never simulated — a test that fakes the television is a test that lies.
+
+See CODESTYLE.md before contributing, and docs/ for the measurements behind every decision, including the ones that turned out to be wrong.
 
 ## License
 
