@@ -9,6 +9,10 @@ import {
 	containerStyleForAspect,
 	videoObjectFitForAspect,
 } from "../../lib/aspect.js";
+import {
+	AutoHideController,
+	FULLSCREEN_BUTTON_HIDE_MS,
+} from "../../lib/autoHideControls.js";
 import { enterFullscreen } from "../../lib/fullscreen.js";
 import { type MediaErrorKind, mediaErrorKind } from "../../lib/mediaError.js";
 import {
@@ -152,6 +156,39 @@ export function ScreenView() {
 					: null;
 		enterFullscreen(document.documentElement, video);
 	}, [state.phase]);
+
+	// Controles con el mismo comportamiento que cualquier reproductor de
+	// video (encargo de cierre de kagami, parte 2): visibles al entrar,
+	// se esconden solos a los 5s sin interaccion. Toque, movimiento de
+	// raton Y pulsacion de tecla cuentan como actividad — esto ultimo es
+	// lo importante, porque el mando de webOS manda eventos de teclado,
+	// no toques ni clics; escuchar solo click/touchstart dejaria el boton
+	// irrecuperable desde el sofa. La logica de cuando esconder vive en
+	// autoHideControls.ts (probada con temporizadores falsos); aqui solo
+	// se conecta a los listeners reales.
+	const [controlsVisible, setControlsVisible] = useState(true);
+	const controlsActive = state.phase === "sharing" || state.phase === "casting";
+	const autoHideControllerRef = useRef<AutoHideController | null>(null);
+	useEffect(() => {
+		if (!controlsActive) return;
+		setControlsVisible(true);
+		const controller = new AutoHideController({
+			hideAfterMs: FULLSCREEN_BUTTON_HIDE_MS,
+			onVisibilityChange: setControlsVisible,
+		});
+		autoHideControllerRef.current = controller;
+		const noteActivity = () => controller.noteActivity();
+		window.addEventListener("mousemove", noteActivity);
+		window.addEventListener("touchstart", noteActivity);
+		window.addEventListener("keydown", noteActivity);
+		return () => {
+			controller.dispose();
+			autoHideControllerRef.current = null;
+			window.removeEventListener("mousemove", noteActivity);
+			window.removeEventListener("touchstart", noteActivity);
+			window.removeEventListener("keydown", noteActivity);
+		};
+	}, [controlsActive]);
 
 	const stopStatsWatcher = useCallback(() => {
 		if (statsIntervalRef.current !== null) {
@@ -418,7 +455,12 @@ export function ScreenView() {
 	useEffect(() => stopStatsWatcher, [stopStatsWatcher]);
 
 	return (
-		<div className="relative flex h-[100dvh] w-[100dvw] items-center justify-center overflow-hidden bg-black text-white">
+		<div
+			className="relative flex h-[100dvh] w-[100dvw] items-center justify-center overflow-hidden bg-black text-white"
+			style={
+				controlsActive && !controlsVisible ? { cursor: "none" } : undefined
+			}
+		>
 			{/* La caja decide el tamaño por modo (containerStyleForAspect); el
 			    video en si es siempre 100%/100%/block dentro de ella y solo
 			    cambia su object-fit (videoObjectFitForAspect). Lo que se ve
@@ -555,13 +597,23 @@ export function ScreenView() {
 				</div>
 			)}
 
-			{(state.phase === "sharing" || state.phase === "casting") && (
+			{controlsActive && (
 				<button
 					type="button"
+					data-testid="fullscreen-button"
 					onClick={handleFullscreenClick}
+					onFocus={() => autoHideControllerRef.current?.setFocused(true)}
+					onBlur={() => autoHideControllerRef.current?.setFocused(false)}
 					aria-label={t("screen.fullscreen")}
 					title={t("screen.fullscreen")}
-					className="absolute top-4 right-4 rounded-full bg-black/40 p-3 text-white/70 hover:bg-black/60 hover:text-white"
+					// opacity + pointer-events, nunca desmontar ni display:none: la
+					// caja no cambia de tamaño (cero scroll en ningun estado) y el
+					// boton sigue alcanzable por tabulacion con el mando aunque este
+					// visualmente oculto — solo se bloquea el click/touch mientras
+					// no se ve, no el foco por teclado.
+					className={`absolute top-4 right-4 rounded-full bg-black/40 p-3 text-white/70 transition-opacity duration-300 hover:bg-black/60 hover:text-white ${
+						controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+					}`}
 				>
 					<Maximize size={28} />
 				</button>
