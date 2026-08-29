@@ -51,13 +51,6 @@ export async function buildApp(webDistDir: string): Promise<FastifyInstance> {
 	registerHealthRoute(app);
 	registerSignaling(app, rooms);
 	await registerCastUpload(app, rooms, castFiles);
-	// /diag/range (apps/server/src/routes/diagRange.ts) ya cumplio su
-	// funcion (docs/spike-range.md, 2026-08-29: la LG real respondio las
-	// cuatro preguntas, la tabla esta rellena) y se retira de produccion
-	// a proposito, tal como decia el comentario que esto reemplaza. El
-	// codigo se deja sin borrar por si hace falta reconstruirlo para otro
-	// televisor — basta con volver a llamar a `registerRangeDiagnostics`
-	// aqui, ver docs/spike-range.md para el procedimiento completo.
 	await registerPages(app, webDistDir);
 
 	return app;

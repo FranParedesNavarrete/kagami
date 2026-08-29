@@ -6,9 +6,8 @@ import { fileURLToPath } from "node:url";
 const here = fileURLToPath(new URL(".", import.meta.url));
 // Directorio TEMPORAL propio (SPECS.md §4.3), aislado por sala: cada
 // codigo de sala tiene su propio subdirectorio, nunca se listan entre
-// salas. Mismo patron de resolucion de ruta que diagRange.ts — dos
-// niveles arriba de src/services (o dist/services) es la raiz de
-// apps/server, funciona igual en dev y en produccion.
+// salas. Dos niveles arriba de src/services (o dist/services) es la
+// raiz de apps/server, funciona igual en dev y en produccion.
 export const CAST_UPLOAD_ROOT = join(here, "../../data/cast-uploads");
 
 // SPECS.md §4.3: "se borran... a las 24h como maximo". El intervalo de
