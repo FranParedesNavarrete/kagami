@@ -20,11 +20,11 @@ test("picking an unsupported container (.mkv) is rejected instantly, before any 
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 
 	// Playwright's setInputFiles ignores the `accept` filter entirely (a
 	// real OS file picker might not, but nothing stops a user from
@@ -47,11 +47,11 @@ test("cast a file: upload, real progress, plays on the TV via range requests", a
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-file-input").setInputFiles(FASTSTART_FIXTURE);
 
 	// Progreso real de subida (no una barra falsa): al menos un "Uploading"
@@ -74,10 +74,12 @@ test("cast a file: upload, real progress, plays on the TV via range requests", a
 		)
 		.toBeGreaterThanOrEqual(1);
 
-	await expect(sender.getByTestId("cast-play-pause")).toContainText("Pause", {
-		timeout: 10_000,
-	});
-	await expect(sender.getByText(/Casting: cast-test\.mp4/)).toBeVisible();
+	await expect(sender.getByTestId("cast-play-pause")).toHaveAttribute(
+		"aria-label",
+		"Pause",
+		{ timeout: 10_000 },
+	);
+	await expect(sender.getByText("cast-test.mp4")).toBeVisible();
 
 	// El fichero servido responde con range requests reales, no solo el
 	// video de la tele "pareciendo" reproducirse.
@@ -105,11 +107,11 @@ test("cast a file with moov at the end: server remuxes automatically and reports
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-file-input").setInputFiles(PLAIN_FIXTURE);
 
 	// "Processing" es justo el remux a faststart pasando de verdad por
@@ -119,9 +121,11 @@ test("cast a file with moov at the end: server remuxes automatically and reports
 		{ timeout: 10_000 },
 	);
 
-	await expect(sender.getByTestId("cast-play-pause")).toContainText("Pause", {
-		timeout: 15_000,
-	});
+	await expect(sender.getByTestId("cast-play-pause")).toHaveAttribute(
+		"aria-label",
+		"Pause",
+		{ timeout: 15_000 },
+	);
 	// Se remuxeo bien: no hace falta el aviso de que el salto puede fallar.
 	await expect(sender.getByText(/seeking may not work/i)).not.toBeVisible();
 
@@ -152,16 +156,18 @@ test("the uploaded file is served only to the room that uploaded it", async ({
 	const otherScreen = await otherScreenCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-file-input").setInputFiles(FASTSTART_FIXTURE);
 
-	await expect(sender.getByTestId("cast-play-pause")).toContainText("Pause", {
-		timeout: 10_000,
-	});
+	await expect(sender.getByTestId("cast-play-pause")).toHaveAttribute(
+		"aria-label",
+		"Pause",
+		{ timeout: 10_000 },
+	);
 	const path = await screen.evaluate(() => {
 		const video = document.querySelector(
 			'[data-testid="cast-video"]',
@@ -172,7 +178,7 @@ test("the uploaded file is served only to the room that uploaded it", async ({
 	// Una sala completamente distinta (un identificador de fichero
 	// imposible de adivinar no basta) no puede pedir el mismo path...
 	await otherScreen.goto("/");
-	await otherScreen.getByText("Be the screen").click();
+	await otherScreen.getByText("Show code").click();
 	const wrongRoomPath = path.replace(code, "ZZZZ");
 	const forbidden = await otherScreen.request.get(wrongRoomPath);
 	expect(forbidden.status()).toBe(404);
@@ -195,16 +201,18 @@ test("closing the room deletes the uploaded file (guaranteed cleanup, path 1)", 
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-file-input").setInputFiles(FASTSTART_FIXTURE);
 
-	await expect(sender.getByTestId("cast-play-pause")).toContainText("Pause", {
-		timeout: 10_000,
-	});
+	await expect(sender.getByTestId("cast-play-pause")).toHaveAttribute(
+		"aria-label",
+		"Pause",
+		{ timeout: 10_000 },
+	);
 	const path = await screen.evaluate(
 		() =>
 			new URL(

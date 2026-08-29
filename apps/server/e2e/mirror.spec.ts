@@ -11,7 +11,7 @@ test("room code, sender joins, shares, and disconnect returns a fresh code", asy
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 
 	const codeLocator = screen.getByTestId("room-code");
 	await expect(codeLocator).toBeVisible();
@@ -40,7 +40,10 @@ test("room code, sender joins, shares, and disconnect returns a fresh code", asy
 	// reales sin cortes en esta tele; H.264 solo funciono parcialmente en
 	// Safari) — el emisor debe mostrarlo, nunca VP9/AV1, nunca
 	// "negotiating..." indefinidamente.
-	await expect(sender.getByText(/codec: video\/vp8/i)).toBeVisible({
+	// El codec ya no esta siempre a la vista (encargo de rediseño, parte
+	// 7: pasa al desplegable "Statistics") — hay que abrirlo primero.
+	await sender.getByText("Statistics").click();
+	await expect(sender.getByText(/video\/vp8/i)).toBeVisible({
 		timeout: 10_000,
 	});
 
@@ -77,7 +80,7 @@ test("screen ending the session sends the sender back home with a clear message"
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
@@ -92,7 +95,10 @@ test("screen ending the session sends the sender back home with a clear message"
 	// el handler de "close" que desde un "leave" explicito).
 	await screenCtx.close();
 
-	await expect(sender.getByText("The screen ended the session")).toBeVisible({
+	// El texto cambio con el rediseño: ya no dice "the screen ended the
+	// session" a secas, explica por que el codigo ya no sirve (encargo de
+	// rediseño, parte 9).
+	await expect(sender.getByText(/no longer works/i)).toBeVisible({
 		timeout: 10_000,
 	});
 	await expect(sender.getByText("Share screen")).not.toBeVisible();
@@ -128,7 +134,7 @@ test("a second sender is rejected once the room is paired", async ({
 	const sender2 = await sender2Ctx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender1.goto(`/?code=${code}`);

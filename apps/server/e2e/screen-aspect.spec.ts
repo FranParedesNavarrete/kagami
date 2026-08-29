@@ -26,6 +26,16 @@ const OBJECT_FIT_BY_MODE: Record<string, string> = {
 	"4:3": "fill",
 };
 
+// El texto visible del segmentado de aspecto ya no coincide siempre con
+// el nombre interno del modo (encargo de rediseño: "expanded" se
+// muestra como "Expanded") — 16:9/21:9/4:3 no cambian.
+const MODE_BUTTON_LABEL: Record<string, string> = {
+	expanded: "Expanded",
+	"16:9": "16:9",
+	"21:9": "21:9",
+	"4:3": "4:3",
+};
+
 // Localiza el video "como lo haria un usuario": el que esta realmente
 // visible (no display:none, con tamaño), nunca "el primero del DOM".
 // Falla fuerte si hay cero o mas de uno visibles a la vez.
@@ -76,7 +86,7 @@ test("mirror: all five aspect modes, located as a user would see them", async ({
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
@@ -90,7 +100,10 @@ test("mirror: all five aspect modes, located as a user would see them", async ({
 	await expect(screen.locator("video")).toHaveCount(1);
 
 	for (const [mode, expectedFit] of Object.entries(OBJECT_FIT_BY_MODE)) {
-		if (mode !== "auto") await sender.getByText(mode, { exact: true }).click();
+		if (mode !== "auto")
+			await sender
+				.getByText(MODE_BUTTON_LABEL[mode] ?? mode, { exact: true })
+				.click();
 
 		await assertNoScrollbar(screen);
 
@@ -117,11 +130,11 @@ test("casting: the video fills the screen honestly, and the hidden mirror video 
 	await screen.route(CAST_URL, fulfillWithRangeSupport);
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-url-input").fill(CAST_URL);
 	await sender.getByTestId("cast-url-submit").click();
 

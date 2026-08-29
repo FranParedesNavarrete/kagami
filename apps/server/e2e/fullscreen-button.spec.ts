@@ -49,7 +49,7 @@ test("the fullscreen button hides after 5s of inactivity and no scroll appears",
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
@@ -84,7 +84,7 @@ test("mousemove brings the button back and resets the countdown", async ({
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 	await sender.goto(`/?code=${code}`);
 	await sender.getByText("Share screen").click();
@@ -116,7 +116,7 @@ test("keydown brings the button back — the webOS remote sends key events, not 
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 	await sender.goto(`/?code=${code}`);
 	await sender.getByText("Share screen").click();
@@ -140,7 +140,7 @@ test("once hidden, the button stops accepting clicks (pointer-events-none), not 
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 	await sender.goto(`/?code=${code}`);
 	await sender.getByText("Share screen").click();

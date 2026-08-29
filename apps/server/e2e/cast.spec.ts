@@ -34,11 +34,11 @@ test("cast a URL: paste, play, pause, seek — reflected on both sides", async (
 	await screen.route(CAST_URL, fulfillWithRangeSupport);
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-url-input").fill(CAST_URL);
 	await sender.getByTestId("cast-url-submit").click();
 
@@ -56,10 +56,14 @@ test("cast a URL: paste, play, pause, seek — reflected on both sides", async (
 		)
 		.toBeGreaterThanOrEqual(1);
 
-	// El estado real de reproduccion vuelve al emisor por cast-status.
-	await expect(sender.getByTestId("cast-play-pause")).toContainText("Pause", {
-		timeout: 10_000,
-	});
+	// El estado real de reproduccion vuelve al emisor por cast-status. El
+	// boton de play/pausa es ahora solo icono (encargo de rediseño, parte
+	// 12) — el estado se comprueba por aria-label, no por texto visible.
+	await expect(sender.getByTestId("cast-play-pause")).toHaveAttribute(
+		"aria-label",
+		"Pause",
+		{ timeout: 10_000 },
+	);
 
 	await sender.getByTestId("cast-play-pause").click();
 	await expect
@@ -69,7 +73,10 @@ test("cast a URL: paste, play, pause, seek — reflected on both sides", async (
 			),
 		)
 		.toBe(true);
-	await expect(sender.getByTestId("cast-play-pause")).toContainText("Play");
+	await expect(sender.getByTestId("cast-play-pause")).toHaveAttribute(
+		"aria-label",
+		"Play",
+	);
 
 	// Saltar a mitad (fixture de 3s): el control remoto del emisor mueve
 	// currentTime de verdad en la tele, no solo en la UI del emisor.
@@ -108,11 +115,11 @@ test("sender disconnecting (locking the phone) does not stop playback on the TV"
 	await screen.route(CAST_URL, fulfillWithRangeSupport);
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-url-input").fill(CAST_URL);
 	await sender.getByTestId("cast-url-submit").click();
 
@@ -159,11 +166,11 @@ test("the same room code reconnects after the sender leaves a cast and recovers 
 	await screen.route(CAST_URL, fulfillWithRangeSupport);
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-url-input").fill(CAST_URL);
 	await sender.getByTestId("cast-url-submit").click();
 
@@ -189,15 +196,17 @@ test("the same room code reconnects after the sender leaves a cast and recovers 
 	const reconnected = await reconnectCtx.newPage();
 	await reconnected.goto(`/?code=${code}`);
 
-	// Recupera el control mostrando la etiqueta de lo que ya se esta
-	// reproduciendo, no el formulario de pegar una URL nueva.
-	await expect(reconnected.getByText(`Casting: ${CAST_URL}`)).toBeVisible({
+	// Recupera el control mostrando lo que ya se esta reproduciendo, no el
+	// formulario de pegar una URL nueva (ya no lleva el prefijo "Casting:",
+	// encargo de rediseño — el nombre solo, en lenguaje normal).
+	await expect(reconnected.getByText(CAST_URL)).toBeVisible({
 		timeout: 10_000,
 	});
 
 	// Y el estado real (posicion avanzada, reproduciendo) — nunca los
 	// valores por defecto (0:00, pausado) como si nada hubiera pasado.
-	await expect(reconnected.getByTestId("cast-play-pause")).toContainText(
+	await expect(reconnected.getByTestId("cast-play-pause")).toHaveAttribute(
+		"aria-label",
 		"Pause",
 		{ timeout: 10_000 },
 	);
@@ -233,11 +242,11 @@ test("rejects a non-http(s) cast URL with a clear message, client-side", async (
 	const sender = await senderCtx.newPage();
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 
 	for (const badUrl of [
 		"javascript:alert(1)",
@@ -274,19 +283,22 @@ test("an unreachable/unsupported cast URL shows a playback error on both sides",
 	);
 
 	await screen.goto("/");
-	await screen.getByText("Be the screen").click();
+	await screen.getByText("Show code").click();
 	const code = (await screen.getByTestId("room-code").innerText()).trim();
 
 	await sender.goto(`/?code=${code}`);
-	await sender.getByText("Cast a URL").click();
+	await sender.getByText("Cast", { exact: true }).click();
 	await sender.getByTestId("cast-url-input").fill(BROKEN_URL);
 	await sender.getByTestId("cast-url-submit").click();
 
 	// Nunca una pantalla negra sin explicar por que (encargo M1, parte 2).
-	await expect(screen.getByText(/Playback error:/i)).toBeVisible({
+	// Los textos exactos cambiaron con el rediseño (tres niveles: icono,
+	// titular, detalle — encargo de rediseño, parte 9) pero el titular
+	// sigue siendo el mismo en las dos vistas.
+	await expect(screen.getByText("This video can't be played")).toBeVisible({
 		timeout: 10_000,
 	});
-	await expect(sender.getByText(/Playback error:/i)).toBeVisible({
+	await expect(sender.getByText("The TV couldn't play this link")).toBeVisible({
 		timeout: 10_000,
 	});
 
