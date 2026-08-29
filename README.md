@@ -1,5 +1,7 @@
 # kagami
 
+![kagami](.github/logo-lockup.png)
+
 Screen mirroring and casting for any TV with a browser. Self-hosted,
 no cables, no store apps, no accounts.
 
