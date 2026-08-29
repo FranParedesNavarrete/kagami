@@ -17,6 +17,11 @@ introduces the two devices.
 - **Cast a file** — pick a video from your phone or computer; it streams
   to the TV even if you lock your phone. Files are stored temporarily on
   your server and deleted when the session ends.
+- **Multiple screens at once** — each room is independent, so the same
+  sender can feed several TVs simultaneously, and any number of rooms can
+  run side by side. Verified in real use, not just by design. This is one
+  of the few things kagami does that AirPlay doesn't: AirPlay is a 1:1
+  session between one sender and one screen.
 
 ## What it honestly does not do
 
