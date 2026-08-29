@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Vista pantalla: cero scroll, siempre, en cualquier modo de aspecto,
+   tambien en la pantalla de codigo y al volver a ella tras cortar la
+   sala. Aplicado/quitado por ScreenView al montar/desmontar (toggle de
+   clase, nunca calculo de estilos por JS). webOS reporta 100vh
+   incluyendo area oculta bajo su propia barra — eso es lo que producia
+   la barra de scroll — asi que ScreenView usa 100dvh/100dvw ademas de
+   este bloqueo, nunca 100vh/100vw a secas. */
+html.kagami-fullscreen,
+body.kagami-fullscreen {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	overflow: hidden;
+}
+
+body.kagami-fullscreen {
+	background: #000;
+}

@@ -97,8 +97,10 @@ describe("ServerMessageSchema", () => {
 
 	it("accepts set-aspect-mode with a valid mode", () => {
 		expect(
-			ServerMessageSchema.safeParse({ type: "set-aspect-mode", mode: "cover" })
-				.success,
+			ServerMessageSchema.safeParse({
+				type: "set-aspect-mode",
+				mode: "expanded",
+			}).success,
 		).toBe(true);
 	});
 });

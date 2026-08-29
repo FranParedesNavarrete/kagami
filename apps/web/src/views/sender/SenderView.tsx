@@ -92,6 +92,13 @@ function joinErrorKey(code: string): I18nKey {
 	return key;
 }
 
+// Cada modo cuesta algo distinto (bandas, recorte o deformacion) y hay
+// que decirlo sin eufemismos, no dejar que se descubra mirando la tele.
+function aspectHintKey(mode: AspectMode): I18nKey {
+	const key = `sender.aspectHint.${mode}` as I18nKey;
+	return key;
+}
+
 interface Props {
 	initialCode: string;
 	onExit: () => void;
@@ -711,6 +718,9 @@ export function SenderView({ initialCode, onExit }: Props) {
 								</button>
 							))}
 						</div>
+						<p className="max-w-md text-xs text-white/40">
+							{t(aspectHintKey(aspectMode))}
+						</p>
 					</div>
 
 					<button

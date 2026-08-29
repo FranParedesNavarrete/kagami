@@ -3,7 +3,11 @@ import { DebugOverlay } from "../../components/DebugOverlay.js";
 import { QrCode } from "../../components/QrCode.js";
 import { useSignaling } from "../../hooks/useSignaling.js";
 import { useI18n } from "../../i18n/i18n.js";
-import { type AspectMode, videoStyleForAspect } from "../../lib/aspect.js";
+import {
+	type AspectMode,
+	containerStyleForAspect,
+	videoObjectFitForAspect,
+} from "../../lib/aspect.js";
 import {
 	type PeerSession,
 	RTC_CONFIG,
@@ -57,6 +61,19 @@ export function ScreenView() {
 	useEffect(() => {
 		if (status === "open") send({ type: "create-room" });
 	}, [status, send]);
+
+	// Cero scroll, siempre, en cualquier modo y tambien en la pantalla de
+	// codigo — toggle de clase (ver index.css), nunca calculo de estilos
+	// por JS. Se quita al desmontar para no afectar a otras vistas (el
+	// emisor si necesita poder hacer scroll en pantallas pequeñas).
+	useEffect(() => {
+		document.documentElement.classList.add("kagami-fullscreen");
+		document.body.classList.add("kagami-fullscreen");
+		return () => {
+			document.documentElement.classList.remove("kagami-fullscreen");
+			document.body.classList.remove("kagami-fullscreen");
+		};
+	}, []);
 
 	// La tele se duerme sola: el salvapantallas de webOS no considera un
 	// video WebRTC "actividad". Screen Wake Lock API mientras hay video;
@@ -228,19 +245,34 @@ export function ScreenView() {
 	useEffect(() => stopStatsWatcher, [stopStatsWatcher]);
 
 	return (
-		<div className="flex min-h-screen items-center justify-center bg-black text-white">
-			{/* biome-ignore lint/a11y/useMediaCaption: espejo en vivo, no hay pista de subtitulos que adjuntar */}
-			<video
-				ref={videoRef}
-				autoPlay
-				playsInline
-				className={state.phase === "sharing" ? undefined : "hidden"}
+		<div className="flex h-[100dvh] w-[100dvw] items-center justify-center overflow-hidden bg-black text-white">
+			{/* La caja decide el tamaño por modo (containerStyleForAspect); el
+			    video en si es siempre 100%/100%/block dentro de ella y solo
+			    cambia su object-fit (videoObjectFitForAspect). Lo que se ve
+			    "vacio" alrededor de la caja es el fondo #000 de este div raiz
+			    asomando — nunca un elemento de franja por encima del video. */}
+			<div
+				data-testid="video-wrapper"
+				className={
+					state.phase === "sharing"
+						? "flex items-center justify-center"
+						: "hidden"
+				}
 				style={
 					state.phase === "sharing"
-						? videoStyleForAspect(aspectMode)
+						? containerStyleForAspect(aspectMode)
 						: undefined
 				}
-			/>
+			>
+				{/* biome-ignore lint/a11y/useMediaCaption: espejo en vivo, no hay pista de subtitulos que adjuntar */}
+				<video
+					ref={videoRef}
+					autoPlay
+					playsInline
+					className="block h-full w-full"
+					style={{ objectFit: videoObjectFitForAspect(aspectMode) }}
+				/>
+			</div>
 
 			{state.phase !== "sharing" && (
 				<div className="flex flex-col items-center gap-6 text-center">

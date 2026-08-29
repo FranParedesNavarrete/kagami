@@ -32,7 +32,7 @@ const iceCandidateSchema = z.object({
 // receptor, nunca toca la conexion WebRTC.
 export const AspectModeSchema = z.enum([
 	"auto",
-	"cover",
+	"expanded",
 	"16:9",
 	"21:9",
 	"4:3",
