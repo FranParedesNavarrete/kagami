@@ -1,6 +1,7 @@
-import { Maximize } from "lucide-react";
+import { CircleAlert, Maximize } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DebugOverlay } from "../../components/DebugOverlay.js";
+import { Lockup } from "../../components/Lockup.js";
 import { QrCode } from "../../components/QrCode.js";
 import { useSignaling } from "../../hooks/useSignaling.js";
 import { type I18nKey, useI18n } from "../../i18n/i18n.js";
@@ -13,6 +14,7 @@ import {
 	AutoHideController,
 	FULLSCREEN_BUTTON_HIDE_MS,
 } from "../../lib/autoHideControls.js";
+import { formatTime } from "../../lib/format.js";
 import { enterFullscreen } from "../../lib/fullscreen.js";
 import { type MediaErrorKind, mediaErrorKind } from "../../lib/mediaError.js";
 import {
@@ -83,6 +85,28 @@ export function ScreenView() {
 	useEffect(() => {
 		phaseRef.current = state.phase;
 	}, [state.phase]);
+
+	// Cuenta atras real de la caducidad del codigo (encargo de rediseño,
+	// parte 13): "Expires in 10 min" mentia en cuanto pasaba un minuto,
+	// porque expiresInMs solo se leia una vez al recibir el mensaje. Aqui
+	// se recalcula cada segundo a partir de un timestamp real, nunca del
+	// valor original sin mas.
+	const codeStartedAtRef = useRef(0);
+	const [nowTick, setNowTick] = useState(0);
+	useEffect(() => {
+		if (state.phase !== "code") return;
+		const interval = window.setInterval(() => setNowTick((n) => n + 1), 1000);
+		return () => clearInterval(interval);
+	}, [state.phase]);
+	const remainingMs =
+		state.phase === "code"
+			? Math.max(
+					0,
+					state.expiresInMs - (performance.now() - codeStartedAtRef.current),
+				)
+			: 0;
+	// nowTick solo existe para forzar el recalculo de arriba cada segundo.
+	void nowTick;
 
 	// Intento de autoplay explicito (no el atributo HTML) para poder
 	// capturar el rechazo: si la tele exige interaccion, se pide con letra
@@ -165,13 +189,12 @@ export function ScreenView() {
 	// no toques ni clics; escuchar solo click/touchstart dejaria el boton
 	// irrecuperable desde el sofa. La logica de cuando esconder vive en
 	// autoHideControls.ts (probada con temporizadores falsos); aqui solo
-	// se conecta a los listeners reales.
+	// se conecta a los listeners reales. Activo desde el primer momento
+	// (encargo de rediseño, parte 14 — el lockup y el boton son un fijo
+	// de toda la vista pantalla, no solo mientras hay video).
 	const [controlsVisible, setControlsVisible] = useState(true);
-	const controlsActive = state.phase === "sharing" || state.phase === "casting";
 	const autoHideControllerRef = useRef<AutoHideController | null>(null);
 	useEffect(() => {
-		if (!controlsActive) return;
-		setControlsVisible(true);
 		const controller = new AutoHideController({
 			hideAfterMs: FULLSCREEN_BUTTON_HIDE_MS,
 			onVisibilityChange: setControlsVisible,
@@ -188,7 +211,7 @@ export function ScreenView() {
 			window.removeEventListener("touchstart", noteActivity);
 			window.removeEventListener("keydown", noteActivity);
 		};
-	}, [controlsActive]);
+	}, []);
 
 	const stopStatsWatcher = useCallback(() => {
 		if (statsIntervalRef.current !== null) {
@@ -284,6 +307,7 @@ export function ScreenView() {
 			subscribe((msg) => {
 				switch (msg.type) {
 					case "room-created":
+						codeStartedAtRef.current = performance.now();
 						setState({
 							phase: "code",
 							code: msg.code,
@@ -456,15 +480,13 @@ export function ScreenView() {
 
 	return (
 		<div
-			className="relative flex h-[100dvh] w-[100dvw] items-center justify-center overflow-hidden bg-black text-white"
-			style={
-				controlsActive && !controlsVisible ? { cursor: "none" } : undefined
-			}
+			className="relative flex h-[100dvh] w-[100dvw] items-center justify-center overflow-hidden bg-ink text-silver"
+			style={!controlsVisible ? { cursor: "none" } : undefined}
 		>
 			{/* La caja decide el tamaño por modo (containerStyleForAspect); el
 			    video en si es siempre 100%/100%/block dentro de ella y solo
 			    cambia su object-fit (videoObjectFitForAspect). Lo que se ve
-			    "vacio" alrededor de la caja es el fondo #000 de este div raiz
+			    "vacio" alrededor de la caja es el fondo de este div raiz
 			    asomando — nunca un elemento de franja por encima del video. */}
 			<div
 				data-testid="video-wrapper"
@@ -521,7 +543,7 @@ export function ScreenView() {
 						}}
 					/>
 					{state.needsInteraction && !state.errorKind && (
-						<div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/80 text-center">
+						<div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-ink/80 text-center">
 							<p className="text-4xl">{t("screen.castTapToPlay")}</p>
 							<button
 								type="button"
@@ -537,19 +559,29 @@ export function ScreenView() {
 										})
 										.catch(() => {});
 								}}
-								className="rounded-xl bg-blue-600 px-10 py-5 text-3xl font-semibold"
+								className="cursor-pointer rounded-md bg-silver px-10 py-5 text-3xl font-semibold text-ink hover:bg-white"
 							>
 								{t("screen.castTapToPlayButton")}
 							</button>
 						</div>
 					)}
 					{state.errorKind && (
-						<div className="absolute inset-0 flex items-center justify-center bg-black/90">
-							<p className="max-w-2xl px-6 text-3xl text-red-400">
-								{t("screen.castErrorPrefix", {
-									message: t(mediaErrorKey(state.errorKind)),
-								})}
-							</p>
+						<div className="absolute inset-0 flex items-center justify-center bg-ink/90 px-[6%] text-center">
+							<div className="flex max-w-[66%] flex-col items-center gap-[0.5em]">
+								<CircleAlert
+									size={34}
+									strokeWidth={1.5}
+									className="mb-[2%] text-coral"
+								/>
+								<h3 className="text-[clamp(17px,2.6vw,34px)] font-semibold text-coral">
+									{t("screen.castErrorTitle")}
+								</h3>
+								<p className="text-[clamp(11px,1.5vw,18px)] text-muted">
+									{t(mediaErrorKey(state.errorKind))}
+									<br />
+									{t("screen.castErrorHint")}
+								</p>
+							</div>
 						</div>
 					)}
 				</div>
@@ -558,66 +590,97 @@ export function ScreenView() {
 			{state.phase !== "sharing" && state.phase !== "casting" && (
 				<div className="flex flex-col items-center gap-6 text-center">
 					{state.phase === "connecting" && (
-						<p className="text-4xl">{t("screen.connecting")}</p>
+						<p className="text-4xl text-muted">{t("screen.connecting")}</p>
 					)}
 
 					{state.phase === "code" && (
 						<>
-							<p
-								data-testid="room-code"
-								className="font-mono text-9xl font-bold tracking-widest"
+							<div data-testid="room-code" className="mb-[3%]">
+								{/* inline-block + margin, nunca flex/grid: un contenedor flex
+								hace que innerText() inserte un salto de linea entre cada
+								celda (cada hijo de flex se trata como "de bloque" a
+								efectos de serializar texto, aunque se vean en fila) — el
+								propio e2e lee el codigo con innerText() y se rompia. */}
+								{state.code.split("").map((char, i) => (
+									<span
+										// biome-ignore lint/suspicious/noArrayIndexKey: el codigo es estable mientras esta fase esta montada
+										key={i}
+										className="mr-[clamp(6px,1.1vw,16px)] inline-block min-w-[0.72em] border-b-[3px] border-glass-dim px-[0.12em] pt-[0.06em] pb-[0.1em] font-display text-[clamp(44px,9.5vw,132px)] font-semibold leading-none text-silver last:mr-0"
+									>
+										{char}
+									</span>
+								))}
+							</div>
+							<div
+								className="inline-block w-[clamp(96px,22vw,300px)] overflow-hidden rounded-lg bg-silver leading-none"
+								data-testid="room-code-qr"
 							>
-								{state.code}
-							</p>
-							<QrCode value={senderUrl(state.code)} size={220} />
-							<p className="max-w-md text-2xl text-white/70">
+								<QrCode value={senderUrl(state.code)} />
+							</div>
+							<p className="mt-[3%] text-[clamp(11px,1.5vw,19px)] text-muted">
 								{t("screen.waitingHint")}
 							</p>
-							<p className="text-lg text-white/40">
-								{t("screen.expiresIn", {
-									minutes: Math.round(state.expiresInMs / 60_000),
-								})}
-							</p>
+							<div
+								className="mt-[2.4%] flex items-center justify-center gap-2.5"
+								aria-label={t("screen.expiresInAria")}
+							>
+								<div className="h-[3px] w-[clamp(90px,14vw,190px)] overflow-hidden rounded-full bg-ink-4">
+									<div
+										className="h-full rounded-full bg-glass transition-[width] duration-1000 ease-linear"
+										style={{
+											width: `${Math.min(100, Math.max(0, (remainingMs / state.expiresInMs) * 100))}%`,
+										}}
+									/>
+								</div>
+								<span className="font-mono text-[clamp(9px,1.1vw,13px)] text-faint">
+									{formatTime(remainingMs / 1000)}
+								</span>
+							</div>
 						</>
 					)}
 
 					{state.phase === "peer-connecting" && (
-						<p className="text-4xl">{t("screen.peerConnecting")}</p>
+						<p className="text-4xl text-muted">{t("screen.peerConnecting")}</p>
 					)}
 
 					{state.phase === "stalled" && (
-						<p className="text-4xl text-yellow-400">{t("screen.stalled")}</p>
+						<p className="text-4xl text-amber">{t("screen.stalled")}</p>
 					)}
 
 					{state.phase === "error" && (
-						<p className="text-3xl text-red-400">
+						<p className="text-3xl text-coral">
 							{t("screen.errorPrefix", { message: state.message })}
 						</p>
 					)}
 				</div>
 			)}
 
-			{controlsActive && (
-				<button
-					type="button"
-					data-testid="fullscreen-button"
-					onClick={handleFullscreenClick}
-					onFocus={() => autoHideControllerRef.current?.setFocused(true)}
-					onBlur={() => autoHideControllerRef.current?.setFocused(false)}
-					aria-label={t("screen.fullscreen")}
-					title={t("screen.fullscreen")}
-					// opacity + pointer-events, nunca desmontar ni display:none: la
-					// caja no cambia de tamaño (cero scroll en ningun estado) y el
-					// boton sigue alcanzable por tabulacion con el mando aunque este
-					// visualmente oculto — solo se bloquea el click/touch mientras
-					// no se ve, no el foco por teclado.
-					className={`absolute top-4 right-4 rounded-full bg-black/40 p-3 text-white/70 transition-opacity duration-300 hover:bg-black/60 hover:text-white ${
-						controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
-					}`}
-				>
-					<Maximize size={28} />
-				</button>
-			)}
+			{/* Marca y boton de pantalla completa: siempre fuera de la caja del
+			    video (video-wrapper) — encargo de rediseño, regla que no se
+			    puede romper. Son un fijo de toda la vista pantalla, no solo
+			    mientras hay video (encargo, parte 14). */}
+			<div className="absolute left-[3.5%] top-[3.5%] opacity-50">
+				<Lockup size={20} />
+			</div>
+			<button
+				type="button"
+				data-testid="fullscreen-button"
+				onClick={handleFullscreenClick}
+				onFocus={() => autoHideControllerRef.current?.setFocused(true)}
+				onBlur={() => autoHideControllerRef.current?.setFocused(false)}
+				aria-label={t("screen.fullscreen")}
+				title={t("screen.fullscreen")}
+				// opacity + pointer-events, nunca desmontar ni display:none: la
+				// caja no cambia de tamaño (cero scroll en ningun estado) y el
+				// boton sigue alcanzable por tabulacion con el mando aunque este
+				// visualmente oculto — solo se bloquea el click/touch mientras
+				// no se ve, no el foco por teclado.
+				className={`absolute right-[3.5%] top-[3.5%] grid h-[clamp(28px,3.4vw,44px)] w-[clamp(28px,3.4vw,44px)] cursor-pointer place-items-center rounded-sm border border-silver/10 bg-silver/[0.07] text-silver transition-opacity duration-300 hover:bg-silver/[0.14] ${
+					controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+				}`}
+			>
+				<Maximize size="55%" />
+			</button>
 
 			{DEBUG && Object.keys(debugInfo).length > 0 && (
 				<DebugOverlay title="screen" rows={debugInfo} />

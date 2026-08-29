@@ -1,7 +1,7 @@
-import { RoomCodeSchema } from "@kagami/shared";
 import { Monitor, Smartphone } from "lucide-react";
-import { useState } from "react";
+import { CodeInput } from "../components/CodeInput.js";
 import { LanguageSwitcher } from "../components/LanguageSwitcher.js";
+import { Lockup } from "../components/Lockup.js";
 import { useI18n } from "../i18n/i18n.js";
 
 interface Props {
@@ -9,61 +9,56 @@ interface Props {
 	onJoin: (code: string) => void;
 }
 
+// Dos caminos con su propio sitio, no un boton azul enorme y una caja
+// "CODE" pegada a un "Join" gris (encargo de rediseño, parte 9/10).
 export function HomeView({ onBeScreen, onJoin }: Props) {
 	const { t } = useI18n();
-	const [code, setCode] = useState("");
-	const valid = RoomCodeSchema.safeParse(code).success;
 
 	return (
-		<div className="flex min-h-screen flex-col items-center justify-center gap-10 bg-neutral-950 px-6 text-white">
-			<div className="absolute right-6 top-6">
+		<div className="flex min-h-screen flex-col bg-ink text-silver">
+			<header className="flex items-center justify-between px-5 py-4">
+				<Lockup />
 				<LanguageSwitcher />
-			</div>
+			</header>
 
-			<h1 className="text-5xl font-bold">{t("app.title")}</h1>
-
-			<button
-				type="button"
-				onClick={onBeScreen}
-				className="flex items-center gap-3 rounded-xl bg-blue-600 px-8 py-4 text-xl font-semibold hover:bg-blue-500"
-			>
-				<Monitor size={28} />
-				{t("home.beScreen")}
-			</button>
-			<p className="-mt-8 text-sm text-white/50">{t("home.beScreenHint")}</p>
-
-			<form
-				className="flex flex-col items-center gap-3"
-				onSubmit={(e) => {
-					e.preventDefault();
-					if (valid) onJoin(code);
-				}}
-			>
-				<label
-					htmlFor="room-code"
-					className="flex items-center gap-2 text-white/70"
-				>
-					<Smartphone size={18} />
-					{t("home.haveCode")}
-				</label>
-				<div className="flex gap-2">
-					<input
-						id="room-code"
-						value={code}
-						onChange={(e) => setCode(e.target.value.toUpperCase())}
-						placeholder={t("home.codePlaceholder")}
-						maxLength={4}
-						className="w-32 rounded-lg bg-neutral-800 px-4 py-3 text-center text-2xl tracking-widest"
-					/>
-					<button
-						type="submit"
-						disabled={!valid}
-						className="rounded-lg bg-blue-600 px-6 py-3 font-semibold disabled:bg-neutral-700 disabled:text-white/30"
-					>
-						{t("home.join")}
-					</button>
+			<main className="flex flex-1 flex-col justify-center gap-8 px-5 py-8">
+				<div className="max-w-[560px]">
+					<h1 className="font-display text-[26px] font-semibold tracking-tight">
+						{t("home.title")}
+					</h1>
+					<p className="mt-1.5 text-sm text-muted">{t("home.subtitle")}</p>
 				</div>
-			</form>
+
+				<div className="grid max-w-[560px] grid-cols-1 gap-4 sm:grid-cols-2">
+					<div className="flex flex-col gap-3 rounded-md border border-line bg-ink-2 p-6">
+						<Monitor size={22} strokeWidth={1.6} className="text-glass" />
+						<div>
+							<p className="mb-0.5 font-semibold text-silver">
+								{t("home.beScreen")}
+							</p>
+							<p className="text-[13px] text-muted">{t("home.beScreenHint")}</p>
+						</div>
+						<button
+							type="button"
+							onClick={onBeScreen}
+							className="mt-auto w-full cursor-pointer rounded-md bg-silver px-4 py-2.5 text-sm font-semibold text-ink hover:bg-white"
+						>
+							{t("home.showCode")}
+						</button>
+					</div>
+
+					<div className="flex flex-col gap-3 rounded-md border border-line bg-ink-2 p-6">
+						<Smartphone size={22} strokeWidth={1.6} className="text-glass" />
+						<div>
+							<p className="mb-0.5 font-semibold text-silver">
+								{t("home.haveCode")}
+							</p>
+							<p className="text-[13px] text-muted">{t("home.haveCodeHint")}</p>
+						</div>
+						<CodeInput onComplete={onJoin} />
+					</div>
+				</div>
+			</main>
 		</div>
 	);
 }
