@@ -73,9 +73,19 @@ Behind Caddy with the `casa` CLI: `sudo casa app alta kagami 7421`.
 |---|---|---|
 | `KAGAMI_PORT` | `7421` | HTTP port (bind it to 127.0.0.1 behind a proxy) |
 | `KAGAMI_CAST_MAX_MB` | `4096` | Max size of an uploaded cast file |
+| `KAGAMI_REMUX_FASTSTART` | `false` | Re-mux an uploaded mp4 with the `moov` atom at the end before serving it |
 
 That is the whole configuration. Rooms live in memory, files live in a
 temp dir with guaranteed cleanup; there is no database.
+
+`KAGAMI_REMUX_FASTSTART` is off by default because it isn't needed here:
+measured against a real LG TV (2026-08-29, see `docs/spike-range.md`),
+its browser resolves a trailing `moov` atom with a single range request
+for the last ~75KB of the file, then seeks correctly — remuxing would
+mean rewriting the whole file (minutes of wait and double the disk for
+a multi-GB upload) to fix something that isn't broken on this TV. The
+remux code and its tests stay in the codebase for receivers that do
+need it; set this to `true` if yours turns out to be one of them.
 
 ## System audio on Safari and Firefox
 

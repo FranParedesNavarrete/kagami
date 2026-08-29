@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	CastUrlSchema,
 	ClientMessageSchema,
+	EnvSchema,
 	ROOM_CODE_ALPHABET,
 	RoomCodeSchema,
 	ServerMessageSchema,
@@ -263,5 +264,30 @@ describe("ServerMessageSchema", () => {
 				mode: "expanded",
 			}).success,
 		).toBe(true);
+	});
+});
+
+describe("EnvSchema", () => {
+	it("defaults KAGAMI_REMUX_FASTSTART to false when unset", () => {
+		expect(EnvSchema.parse({}).KAGAMI_REMUX_FASTSTART).toBe(false);
+	});
+
+	it('treats "true" and "1" as enabled', () => {
+		expect(
+			EnvSchema.parse({ KAGAMI_REMUX_FASTSTART: "true" })
+				.KAGAMI_REMUX_FASTSTART,
+		).toBe(true);
+		expect(
+			EnvSchema.parse({ KAGAMI_REMUX_FASTSTART: "1" }).KAGAMI_REMUX_FASTSTART,
+		).toBe(true);
+	});
+
+	it('treats anything else, including the literal string "false", as disabled', () => {
+		for (const value of ["false", "0", "no", "TRUE"]) {
+			expect(
+				EnvSchema.parse({ KAGAMI_REMUX_FASTSTART: value })
+					.KAGAMI_REMUX_FASTSTART,
+			).toBe(false);
+		}
 	});
 });

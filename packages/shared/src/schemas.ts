@@ -172,5 +172,16 @@ export type ServerMessage = z.infer<typeof ServerMessageSchema>;
 export const EnvSchema = z.object({
 	KAGAMI_PORT: z.coerce.number().int().positive().default(7421),
 	KAGAMI_CAST_MAX_MB: z.coerce.number().int().positive().default(4096),
+	// Desactivado por defecto (medido en la LG real, 2026-08-29, ver
+	// docs/spike-range.md): esta tele resuelve un moov al final con una
+	// sola peticion de rango a la cola del fichero — remuxear de serie
+	// reescribe el mp4 entero (minutos de espera y el doble de disco para
+	// un fichero de ~2GB) para arreglar algo que no esta roto en esta
+	// tele. El codigo y los tests del remux se mantienen para receptores
+	// que si lo necesiten.
+	KAGAMI_REMUX_FASTSTART: z
+		.string()
+		.default("false")
+		.transform((v) => v === "true" || v === "1"),
 });
 export type Env = z.infer<typeof EnvSchema>;

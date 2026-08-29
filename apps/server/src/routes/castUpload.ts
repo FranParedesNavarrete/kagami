@@ -87,7 +87,14 @@ async function processVideoAfterUpload(
 ): Promise<void> {
 	let seekMayNotWork = false;
 
-	if (file.ext === "mp4") {
+	// Desactivado por defecto (KAGAMI_REMUX_FASTSTART, ver env.ts): medido
+	// en la LG real que resuelve un moov al final con una sola peticion de
+	// rango a la cola del fichero (docs/spike-range.md), asi que remuxear
+	// de serie solo gastaria minutos y el doble de disco para arreglar
+	// algo que no esta roto en esta tele. Si esta desactivado, no hay
+	// ninguna comprobacion de moov ni ningun aviso que mandar — no hay
+	// nada que avisar.
+	if (file.ext === "mp4" && env.KAGAMI_REMUX_FASTSTART) {
 		const path = files.pathFor(file);
 		let needsRemux: boolean | null = null;
 		try {
