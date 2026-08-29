@@ -235,12 +235,20 @@ export async function registerCastUpload(
 		reply.send({ ok: true });
 
 		if (file.kind === "video") {
-			processVideoAfterUpload(rooms, files, file, filename).catch((err) =>
+			processVideoAfterUpload(rooms, files, file, filename).catch((err) => {
+				// Fallo catastrofico e inesperado (no el remux fallando, eso ya
+				// se degrada solo a seekMayNotWork): sin esto, el emisor se
+				// quedaria esperando "procesando..." para siempre, sin ningun
+				// aviso — justo lo que "nunca fallar en silencio" prohibe.
 				logger.error(
 					{ err, roomCode },
 					"cast file post-processing failed unexpectedly",
-				),
-			);
+				);
+				rooms.sendToSender(roomCode, {
+					type: "cast-file-error",
+					message: "processing the uploaded file failed unexpectedly",
+				});
+			});
 		} else {
 			announceCastFileReady(rooms, files, file, filename);
 		}

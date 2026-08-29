@@ -83,6 +83,10 @@ interface CastPlaybackState {
 	paused: boolean;
 	ended: boolean;
 	volume: number;
+	// Solo para cast de fichero: el atomo moov estaba al final y no se
+	// pudo remuxear (ffmpeg no disponible, o el remux fallo) — se sirve
+	// el fichero tal cual, pero el salto puede no funcionar de verdad.
+	seekMayNotWork: boolean;
 	errorMessage: string | null;
 }
 
@@ -93,8 +97,17 @@ const EMPTY_CAST_STATE: CastPlaybackState = {
 	paused: true,
 	ended: false,
 	volume: 1,
+	seekMayNotWork: false,
 	errorMessage: null,
 };
+
+type FileUploadState =
+	| { phase: "idle" }
+	| { phase: "uploading"; percent: number }
+	| { phase: "processing"; percent: number | null }
+	| { phase: "error"; message: string };
+
+const IDLE_UPLOAD: FileUploadState = { phase: "idle" };
 
 function formatTime(seconds: number | null): string {
 	if (seconds === null || !Number.isFinite(seconds)) return "--:--";
@@ -184,6 +197,7 @@ export function SenderView({ initialCode, onExit }: Props) {
 	const [castUrlError, setCastUrlError] = useState<string | null>(null);
 	const [castStatus, setCastStatus] =
 		useState<CastPlaybackState>(EMPTY_CAST_STATE);
+	const [fileUpload, setFileUpload] = useState<FileUploadState>(IDLE_UPLOAD);
 	const sessionRef = useRef<PeerSession | null>(null);
 	const streamRef = useRef<MediaStream | null>(null);
 	const joinedRef = useRef(false);
@@ -314,7 +328,57 @@ export function SenderView({ initialCode, onExit }: Props) {
 		setCastStatus(EMPTY_CAST_STATE);
 		setCastUrlInput("");
 		setCastUrlError(null);
+		setFileUpload(IDLE_UPLOAD);
 	}, []);
+
+	// XHR, no fetch: es la unica API con progreso de subida real y de
+	// verdad funciona en Safari (necesario para el flujo del iPhone). El
+	// cuerpo es el fichero tal cual — el nombre viaja en la query, no en
+	// un FormData, porque el server necesita el stream crudo sin
+	// desempaquetar multipart para poder escribirlo a disco en streaming.
+	const uploadCastFile = useCallback(
+		(file: File) => {
+			setFileUpload({ phase: "uploading", percent: 0 });
+			const xhr = new XMLHttpRequest();
+			xhr.upload.addEventListener("progress", (ev) => {
+				if (ev.lengthComputable) {
+					setFileUpload({
+						phase: "uploading",
+						percent: Math.round((ev.loaded / ev.total) * 100),
+					});
+				}
+			});
+			xhr.addEventListener("load", () => {
+				if (xhr.status >= 200 && xhr.status < 300) {
+					// La confirmacion real de que ya se puede reproducir llega
+					// por WS ("cast-file-processing"/"cast-file-ready"), no aqui
+					// — esta respuesta solo dice que la subida en si termino.
+					setFileUpload({ phase: "processing", percent: null });
+					return;
+				}
+				let message = t("sender.castUploadFailed");
+				try {
+					const body = JSON.parse(xhr.responseText) as { error?: string };
+					if (body.error) message = body.error;
+				} catch {
+					// respuesta no-JSON inesperada: se queda el mensaje generico
+				}
+				setFileUpload({ phase: "error", message });
+			});
+			xhr.addEventListener("error", () => {
+				setFileUpload({
+					phase: "error",
+					message: t("sender.castUploadFailed"),
+				});
+			});
+			xhr.open(
+				"POST",
+				`/cast/upload/${initialCode}?filename=${encodeURIComponent(file.name)}`,
+			);
+			xhr.send(file);
+		},
+		[initialCode, t],
+	);
 
 	// startPeerConnection NO vuelve a pedir getDisplayMedia: reutiliza el
 	// stream ya capturado, tanto al empezar como en un restart-ice. Puede
@@ -407,6 +471,23 @@ export function SenderView({ initialCode, onExit }: Props) {
 						// arrancaria en "mirror" y no veria los controles.
 						setSenderMode("cast");
 						setCastStatus({ ...EMPTY_CAST_STATE, url: msg.label });
+						break;
+					case "cast-file-processing":
+						// Remux a faststart en marcha en el server (moov al final,
+						// ver docs/spike-range.md) — puede tardar en ficheros
+						// grandes, se informa del progreso real, no una barra falsa.
+						setFileUpload({ phase: "processing", percent: msg.percent });
+						break;
+					case "cast-file-ready":
+						setFileUpload(IDLE_UPLOAD);
+						setCastStatus({
+							...EMPTY_CAST_STATE,
+							url: msg.filename,
+							seekMayNotWork: msg.seekMayNotWork,
+						});
+						break;
+					case "cast-file-error":
+						setFileUpload({ phase: "error", message: msg.message });
 						break;
 					case "answer":
 						sessionRef.current?.setRemoteDescription(msg.sdp);
@@ -709,34 +790,106 @@ export function SenderView({ initialCode, onExit }: Props) {
 					{senderMode === "cast" && (
 						<div className="flex w-full max-w-md flex-col items-center gap-4">
 							{castStatus.url === null ? (
-								<>
-									<input
-										type="url"
-										inputMode="url"
-										data-testid="cast-url-input"
-										value={castUrlInput}
-										onChange={(e) => setCastUrlInput(e.target.value)}
-										placeholder={t("sender.castUrlPlaceholder")}
-										className="w-full rounded-lg bg-neutral-800 px-4 py-3 text-sm text-white placeholder:text-white/30"
-									/>
-									{castUrlError && (
-										<p className="text-sm text-red-400">{castUrlError}</p>
-									)}
-									<button
-										type="button"
-										data-testid="cast-url-submit"
-										onClick={submitCastUrl}
-										disabled={castUrlInput.trim().length === 0}
-										className="flex items-center gap-3 rounded-xl bg-blue-600 px-8 py-4 text-xl font-semibold hover:bg-blue-500 disabled:bg-neutral-700 disabled:text-white/40"
-									>
-										{t("sender.castUrlSubmit")}
-									</button>
-								</>
+								fileUpload.phase === "idle" ? (
+									<>
+										<input
+											type="url"
+											inputMode="url"
+											data-testid="cast-url-input"
+											value={castUrlInput}
+											onChange={(e) => setCastUrlInput(e.target.value)}
+											placeholder={t("sender.castUrlPlaceholder")}
+											className="w-full rounded-lg bg-neutral-800 px-4 py-3 text-sm text-white placeholder:text-white/30"
+										/>
+										{castUrlError && (
+											<p className="text-sm text-red-400">{castUrlError}</p>
+										)}
+										<button
+											type="button"
+											data-testid="cast-url-submit"
+											onClick={submitCastUrl}
+											disabled={castUrlInput.trim().length === 0}
+											className="flex items-center gap-3 rounded-xl bg-blue-600 px-8 py-4 text-xl font-semibold hover:bg-blue-500 disabled:bg-neutral-700 disabled:text-white/40"
+										>
+											{t("sender.castUrlSubmit")}
+										</button>
+
+										<div className="flex w-full items-center gap-2 text-xs text-white/40">
+											<span className="h-px flex-1 bg-white/10" />
+											{t("sender.castOr")}
+											<span className="h-px flex-1 bg-white/10" />
+										</div>
+
+										{/* accept incluye video E imagen a proposito (SPECS.md
+										§4.3): en iOS, Safari ofrece "Photo Library" como origen
+										en cuanto el accept cubre video/imagen — no hace falta
+										(ni conviene) el atributo "capture", que forzaria la
+										camara y quitaria esa opcion. */}
+										<label className="w-full cursor-pointer rounded-lg bg-neutral-800 px-4 py-3 text-center text-sm text-white/70 hover:bg-neutral-700">
+											{t("sender.castFilePick")}
+											<input
+												type="file"
+												data-testid="cast-file-input"
+												accept="video/mp4,video/webm,video/quicktime,image/jpeg,image/png,image/gif,image/webp"
+												className="hidden"
+												onChange={(e) => {
+													const file = e.target.files?.[0];
+													if (file) uploadCastFile(file);
+													e.target.value = "";
+												}}
+											/>
+										</label>
+									</>
+								) : (
+									<>
+										{fileUpload.phase === "uploading" && (
+											<p
+												data-testid="cast-upload-status"
+												className="text-sm text-white/60"
+											>
+												{t("sender.castUploading", {
+													percent: fileUpload.percent,
+												})}
+											</p>
+										)}
+										{fileUpload.phase === "processing" && (
+											<p
+												data-testid="cast-upload-status"
+												className="text-sm text-white/60"
+											>
+												{fileUpload.percent !== null
+													? t("sender.castProcessingPercent", {
+															percent: fileUpload.percent,
+														})
+													: t("sender.castProcessing")}
+											</p>
+										)}
+										{fileUpload.phase === "error" && (
+											<>
+												<p className="text-sm text-red-400">
+													{fileUpload.message}
+												</p>
+												<button
+													type="button"
+													onClick={() => setFileUpload(IDLE_UPLOAD)}
+													className="text-sm text-white/50 underline"
+												>
+													{t("sender.tryAgain")}
+												</button>
+											</>
+										)}
+									</>
+								)
 							) : (
 								<>
 									<p className="max-w-md truncate text-sm text-white/60">
 										{t("sender.castNowPlaying", { url: castStatus.url })}
 									</p>
+									{castStatus.seekMayNotWork && (
+										<p className="max-w-md text-xs text-yellow-400">
+											{t("sender.castSeekMayNotWork")}
+										</p>
+									)}
 									{castStatus.errorMessage ? (
 										<p className="text-red-400">
 											{t("sender.castErrorPrefix", {
