@@ -3,6 +3,7 @@ import { rm } from "node:fs/promises";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import fastifyStatic from "@fastify/static";
+import { extensionFromFilename } from "@kagami/shared";
 import type { FastifyInstance } from "fastify";
 import { env } from "../lib/env.js";
 import {
@@ -68,11 +69,6 @@ class UploadGuard extends Transform {
 		}
 		callback();
 	}
-}
-
-function extensionFromFilename(filename: string): string {
-	const match = /\.([a-zA-Z0-9]+)$/.exec(filename);
-	return match?.[1]?.toLowerCase() ?? "";
 }
 
 // mp4 y mov comparten cabecera ISO-BMFF (fileSniff.ts): se guardan

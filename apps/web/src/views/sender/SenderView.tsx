@@ -1,7 +1,11 @@
 import {
+	ALLOWED_CAST_EXTENSIONS,
 	type AspectMode,
+	CAST_ALLOWED_EXTENSIONS_DISPLAY,
+	CAST_FILE_ACCEPT,
 	CastUrlSchema,
 	type ServerMessage,
+	extensionFromFilename,
 } from "@kagami/shared";
 import { Mic, MicOff, MonitorUp, Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -844,18 +848,34 @@ export function SenderView({ initialCode, onExit }: Props) {
 										§4.3): en iOS, Safari ofrece "Photo Library" como origen
 										en cuanto el accept cubre video/imagen — no hace falta
 										(ni conviene) el atributo "capture", que forzaria la
-										camara y quitaria esa opcion. */}
+										camara y quitaria esa opcion. El accept es solo comodidad
+										para que el selector del sistema ya filtre — no todos los
+										navegadores lo hacen cumplir (el usuario puede elegir "todos
+										los ficheros"), asi que el rechazo real va en onChange, antes
+										de subir un solo byte (encargo de cierre, parte 1).*/}
 										<label className="w-full cursor-pointer rounded-lg bg-neutral-800 px-4 py-3 text-center text-sm text-white/70 hover:bg-neutral-700">
 											{t("sender.castFilePick")}
 											<input
 												type="file"
 												data-testid="cast-file-input"
-												accept="video/mp4,video/webm,video/quicktime,image/jpeg,image/png,image/gif,image/webp"
+												accept={CAST_FILE_ACCEPT}
 												className="hidden"
 												onChange={(e) => {
 													const file = e.target.files?.[0];
-													if (file) uploadCastFile(file);
 													e.target.value = "";
+													if (!file) return;
+													const ext = extensionFromFilename(file.name);
+													if (!ALLOWED_CAST_EXTENSIONS.has(ext)) {
+														setFileUpload({
+															phase: "error",
+															message: t("sender.castUnsupportedContainer", {
+																ext: ext || "?",
+																formats: CAST_ALLOWED_EXTENSIONS_DISPLAY,
+															}),
+														});
+														return;
+													}
+													uploadCastFile(file);
 												}}
 											/>
 										</label>

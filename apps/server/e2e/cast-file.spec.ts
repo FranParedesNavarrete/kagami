@@ -7,6 +7,36 @@ const FASTSTART_FIXTURE = fileURLToPath(
 const PLAIN_FIXTURE = fileURLToPath(
 	new URL("./fixtures/cast-test-plain.mp4", import.meta.url),
 );
+const MKV_FIXTURE = fileURLToPath(
+	new URL("./fixtures/cast-test.mkv", import.meta.url),
+);
+
+test("picking an unsupported container (.mkv) is rejected instantly, before any upload starts (cierre de kagami, parte 1)", async ({
+	browser,
+}) => {
+	const screenCtx = await browser.newContext();
+	const senderCtx = await browser.newContext();
+	const screen = await screenCtx.newPage();
+	const sender = await senderCtx.newPage();
+
+	await screen.goto("/");
+	await screen.getByText("Be the screen").click();
+	const code = (await screen.getByTestId("room-code").innerText()).trim();
+
+	await sender.goto(`/?code=${code}`);
+	await sender.getByText("Cast a URL").click();
+
+	// Playwright's setInputFiles ignores the `accept` filter entirely (a
+	// real OS file picker might not, but nothing stops a user from
+	// choosing "all files") — this proves the REAL guard is the onChange
+	// check, not just the accept attribute.
+	await sender.getByTestId("cast-file-input").setInputFiles(MKV_FIXTURE);
+
+	await expect(sender.getByText(/\.mkv/)).toBeVisible();
+	await expect(sender.getByText(/MP4/)).toBeVisible();
+	// Nunca llego a arrancar ninguna subida: ni "Uploading" ni "Processing".
+	await expect(sender.getByTestId("cast-upload-status")).not.toBeVisible();
+});
 
 test("cast a file: upload, real progress, plays on the TV via range requests", async ({
 	browser,

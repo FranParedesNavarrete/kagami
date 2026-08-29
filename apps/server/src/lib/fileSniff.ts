@@ -1,8 +1,15 @@
+import {
+	type CastFileKind,
+	ALLOWED_CAST_EXTENSIONS as SHARED_ALLOWED_CAST_EXTENSIONS,
+	castKindForExtension,
+} from "@kagami/shared";
+
 // Nunca confiar en la extension que manda el cliente ni en el
 // Content-Type declarado — los primeros bytes del fichero dicen la
-// verdad. Cubre exactamente los formatos que SPECS.md permite castear:
-// video (mp4/mov, webm) e imagen (jpeg, png, gif, webp).
-export type SniffedKind = "video" | "image";
+// verdad. La lista de formatos permitidos vive en packages/shared
+// (castFormats.ts), compartida con el filtro del selector en el emisor —
+// un solo sitio que editar, nunca dos listas que se puedan desincronizar.
+export type SniffedKind = CastFileKind;
 
 export interface SniffedType {
 	kind: SniffedKind;
@@ -55,19 +62,7 @@ function isWebp(buf: Buffer): boolean {
 	);
 }
 
-const EXTENSION_KIND: Record<string, SniffedKind> = {
-	mp4: "video",
-	webm: "video",
-	mov: "video",
-	m4v: "video",
-	jpg: "image",
-	jpeg: "image",
-	png: "image",
-	gif: "image",
-	webp: "image",
-};
-
-export const ALLOWED_CAST_EXTENSIONS = new Set(Object.keys(EXTENSION_KIND));
+export const ALLOWED_CAST_EXTENSIONS = SHARED_ALLOWED_CAST_EXTENSIONS;
 
 // mp4 y mov comparten la misma cabecera ISO-BMFF ("ftyp") — no se puede
 // distinguir uno de otro solo por los bytes, asi que la validacion por
@@ -75,7 +70,7 @@ export const ALLOWED_CAST_EXTENSIONS = new Set(Object.keys(EXTENSION_KIND));
 // mando el cliente. Devuelve null si la extension no esta permitida en
 // absoluto.
 export function kindForExtension(ext: string): SniffedKind | null {
-	return EXTENSION_KIND[ext.toLowerCase()] ?? null;
+	return castKindForExtension(ext);
 }
 
 // Comprueba solo la CABECERA del fichero (los primeros ~32 bytes ya

@@ -38,6 +38,7 @@
 	"sender.castProcessing": "Processando…",
 	"sender.castProcessingPercent": "Processando… {percent}%",
 	"sender.castUploadFailed": "Falha no envio",
+	"sender.castUnsupportedContainer": "Você escolheu um arquivo .{ext} — o cast do kagami suporta: {formats}. Converta-o ou escolha outro arquivo.",
 	"sender.castSeekMayNotWork": "O índice deste arquivo está no final e não pôde ser otimizado — o salto pode não funcionar de forma confiável.",
 	"sender.castPlay": "Reproduzir",
 	"sender.castPause": "Pausar",
