@@ -96,10 +96,10 @@ deleted — and a 24-hour sweep that survives a restart catches anything that
 slips through.
 
 <!-- ══════════════════════════════════════════════════════════════════
-     IMAGEN 3 · CAST DESDE EL MOVIL  ·  docs/media/cast-phone.png
-     ~900×1600 vertical. El iPhone con un cast en marcha y los controles.
-     Opcional: si no la haces, borra este comentario y ya esta.
+     IMAGEN 3 · CAST DESDE EL MOVIL  ·  docs/media/cast-phone.jpg
+     El iPhone con un cast en marcha y los controles.
      ══════════════════════════════════════════════════════════════════ -->
+<img src="docs/media/cast-phone.jpg" alt="The kagami sender's cast controls on an iPhone" width="100%">
 
 ### Several screens at once
 
